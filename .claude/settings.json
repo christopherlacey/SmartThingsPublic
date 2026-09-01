@@ -1,0 +1,33 @@
+{
+  "sandbox": {
+    "network": {
+      "allowedDomains": [
+        "*.api.anthropic.com",
+        "*.api.github.com",
+        "*.archive.ubuntu.com",
+        "*.barandcocoa.com",
+        "*.chrislacey.com",
+        "*.codeload.github.com",
+        "*.crates.io",
+        "*.files.pythonhosted.org",
+        "*.github.com",
+        "*.gmail.com",
+        "*.index.crates.io",
+        "*.lacey.me",
+        "*.npmjs.com",
+        "*.npmjs.org",
+        "*.pypi.org",
+        "*.pythonhosted.org",
+        "*.raw.githubusercontent.com",
+        "*.registry.npmjs.org",
+        "*.registry.yarnpkg.com",
+        "*.release-assets.githubusercontent.com",
+        "*.security.ubuntu.com",
+        "*.static.crates.io",
+        "*.www.npmjs.com",
+        "*.www.npmjs.org",
+        "*.yarnpkg.com"
+      ]
+    }
+  }
+}
