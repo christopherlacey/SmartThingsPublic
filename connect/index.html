@@ -379,12 +379,18 @@
   function alertChris(which) {
     try {
       var payload = JSON.stringify(context(which));
+      // text/plain, not application/json. The endpoint is on a different origin
+      // (emergency.chrislacey.com), and application/json is not a CORS-safelisted
+      // content type, so it would force a preflight — which a beacon fired as the
+      // page is being replaced by the dialer often never completes. text/plain
+      // skips the preflight entirely. The body is still JSON; alert.php parses the
+      // raw body and does not look at the content type.
       if (navigator.sendBeacon) {
-        navigator.sendBeacon(ALERT_ENDPOINT, new Blob([payload], { type: "application/json" }));
+        navigator.sendBeacon(ALERT_ENDPOINT, new Blob([payload], { type: "text/plain;charset=UTF-8" }));
       } else {
         var x = new XMLHttpRequest();
         x.open("POST", ALERT_ENDPOINT, true);
-        x.setRequestHeader("Content-Type", "application/json");
+        x.setRequestHeader("Content-Type", "text/plain;charset=UTF-8");
         x.send(payload);
       }
     } catch (e) { /* never block the call */ }

@@ -23,6 +23,7 @@ header('Content-Type: text/plain; charset=utf-8');
 header('Access-Control-Allow-Origin: https://connect.chrislacey.com');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Max-Age: 86400');
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     http_response_code(204);
@@ -50,10 +51,56 @@ if (!is_array($cfg)) {
 // 1. Collect everything we legitimately know about this person.
 // ---------------------------------------------------------------------------
 
-$raw = file_get_contents('php://input') ?: '';
+// Public endpoint: read a bounded amount. A legitimate beacon is ~1 KB; anything
+// larger is either broken or an attempt to make us allocate and log megabytes.
+const MAX_PAYLOAD = 16384;
+
+$stream = fopen('php://input', 'rb');
+$raw = $stream ? (string) stream_get_contents($stream, MAX_PAYLOAD) : '';
+if ($stream) {
+    fclose($stream);
+}
+
 $client = json_decode($raw, true);
 if (!is_array($client)) {
-    $client = ['_note' => 'no client payload', '_raw_bytes' => strlen($raw)];
+    $client = ['_note' => 'no usable client payload', '_raw_bytes' => strlen($raw)];
+}
+
+/** Trim any client-supplied string before it reaches the log or a text message. */
+function clip($v, int $max = 512): ?string
+{
+    if ($v === null || is_array($v) || is_object($v)) {
+        return null;
+    }
+    $s = (string) $v;
+    return strlen($s) > $max ? substr($s, 0, $max) . '…[truncated]' : $s;
+}
+
+/**
+ * Coordinates arrive from the browser and are therefore untrusted. A bad shape used
+ * to be fatal here, which killed the alert before a single channel was tried; a
+ * non-numeric lat/lon used to format as 0,0 — a real place in the Gulf of Guinea.
+ * Both now degrade to "no GPS", and the rest of the alert still goes out.
+ */
+function valid_gps($g): ?array
+{
+    if (!is_array($g) || !isset($g['lat'], $g['lon'])) {
+        return null;
+    }
+    if (!is_numeric($g['lat']) || !is_numeric($g['lon'])) {
+        return null;
+    }
+    $lat = (float) $g['lat'];
+    $lon = (float) $g['lon'];
+    if ($lat < -90 || $lat > 90 || $lon < -180 || $lon > 180) {
+        return null;
+    }
+    return [
+        'lat'        => $lat,
+        'lon'        => $lon,
+        'accuracy_m' => isset($g['accuracy_m']) && is_numeric($g['accuracy_m']) ? (int) $g['accuracy_m'] : null,
+        'at'         => clip($g['at'] ?? null, 40),
+    ];
 }
 
 /** Real client IP, preferring CDN headers over the socket peer. */
@@ -122,10 +169,14 @@ function recent_hits(string $ip, ?string $logPath, int $maxLines = 4000, int $ke
         @fseek($fh, -2_000_000, SEEK_END);
         @fgets($fh); // discard the partial first line
     }
+    // Anchor the match so 10.1.2.3 stops matching 110.1.2.30 — a false hit here is
+    // misleading evidence about where someone was when they pressed the button.
+    $pattern = '/(?<![0-9a-fA-F.:])' . preg_quote($ip, '/') . '(?![0-9a-fA-F.:])/';
+
     $hits = [];
     $lines = 0;
     while (($line = fgets($fh)) !== false && $lines++ < $maxLines) {
-        if (strpos($line, $ip) !== false) {
+        if (preg_match($pattern, $line) === 1) {
             $hits[] = rtrim($line);
             if (count($hits) > $keep) {
                 array_shift($hits);
@@ -138,22 +189,22 @@ function recent_hits(string $ip, ?string $logPath, int $maxLines = 4000, int $ke
 
 $report = [
     'event'        => '911 BUTTON PRESSED on connect.chrislacey.com',
-    'button'       => (string) ($client['button'] ?? 'unknown'),
+    'button'       => clip($client['button'] ?? 'unknown', 40) ?? 'unknown',
     'server_time'  => gmdate('c'),
     'ip'           => $ip,
     'reverse_dns'  => $ip !== 'unknown' ? @gethostbyaddr($ip) : null,
     'edge_geo'     => $edge,
-    'device_time'  => $client['page_time'] ?? null,
-    'device_tz'    => $client['tz'] ?? null,
-    'languages'    => $client['languages'] ?? null,
-    'user_agent'   => $client['user_agent'] ?? ($_SERVER['HTTP_USER_AGENT'] ?? null),
-    'platform'     => $client['platform'] ?? null,
+    'device_time'  => clip($client['page_time'] ?? null, 40),
+    'device_tz'    => clip($client['tz'] ?? null, 64),
+    'languages'    => is_array($client['languages'] ?? null) ? array_slice($client['languages'], 0, 10) : null,
+    'user_agent'   => clip($client['user_agent'] ?? ($_SERVER['HTTP_USER_AGENT'] ?? null)),
+    'platform'     => clip($client['platform'] ?? null, 80),
     'mobile'       => $client['mobile'] ?? null,
-    'screen'       => $client['screen'] ?? null,
-    'network'      => $client['network'] ?? null,
-    'gps'          => $client['coords'] ?? null,   // only present if they allowed location
-    'came_from'    => $client['referrer'] ?? ($_SERVER['HTTP_REFERER'] ?? null),
-    'page_url'     => $client['href'] ?? null,
+    'screen'       => clip($client['screen'] ?? null, 40),
+    'network'      => is_array($client['network'] ?? null) ? $client['network'] : null,
+    'gps'          => valid_gps($client['coords'] ?? null),  // null unless they allowed location
+    'came_from'    => clip($client['referrer'] ?? ($_SERVER['HTTP_REFERER'] ?? null)),
+    'page_url'     => clip($client['href'] ?? null),
     'headers'      => $headers,
     'recent_hits'  => recent_hits($ip, $cfg['access_log'] ?? null),
 ];
@@ -162,22 +213,51 @@ $report = [
 // 2. Local record first — this one cannot fail over the network.
 // ---------------------------------------------------------------------------
 
-$logFile = (string) ($cfg['alert_log'] ?? __DIR__ . '/911-alerts.log');
-@file_put_contents(
+// This log holds IP addresses and sometimes the GPS position of someone in an
+// emergency, so the fallback must never be the web root — a stray directory
+// listing there would publish it. Fall back to the system temp dir instead.
+$logFile = (string) ($cfg['alert_log'] ?? (rtrim(sys_get_temp_dir(), '/') . '/911-alerts.log'));
+
+/**
+ * Append to the log and say whether it worked. "Local record first" is only a
+ * guarantee if a failed write is visible, so failures fall back to the temp dir
+ * and are reported to the server error log rather than being swallowed.
+ */
+function log_line(string $path, string $line): bool
+{
+    $dir = dirname($path);
+    if (!is_dir($dir) || !is_writable($dir)) {
+        $fallback = rtrim(sys_get_temp_dir(), '/') . '/911-alerts.log';
+        if ($path !== $fallback) {
+            error_log("alert.php: cannot write {$path}, falling back to {$fallback}");
+            $path = $fallback;
+        }
+    }
+    $ok = file_put_contents($path, $line, FILE_APPEND | LOCK_EX);
+    if ($ok === false) {
+        // Last resort: the server error log still captures the event.
+        error_log('alert.php: LOCAL LOG WRITE FAILED. ' . rtrim($line));
+        return false;
+    }
+    return true;
+}
+
+$logged = log_line(
     $logFile,
-    gmdate('c') . ' ' . json_encode($report, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . PHP_EOL,
-    FILE_APPEND | LOCK_EX
+    gmdate('c') . ' ' . json_encode($report, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . PHP_EOL
 );
 
 // ---------------------------------------------------------------------------
 // 3. Build the message.
 // ---------------------------------------------------------------------------
 
-$where = $report['gps']
+$gps = $report['gps'];   // already validated: either a clean lat/lon pair or null
+$where = $gps !== null
     ? sprintf(
-        'GPS %.5f,%.5f (±%dm)  https://maps.google.com/?q=%.5f,%.5f',
-        $report['gps']['lat'], $report['gps']['lon'], (int) ($report['gps']['accuracy_m'] ?? 0),
-        $report['gps']['lat'], $report['gps']['lon']
+        'GPS %.5f,%.5f%s  https://maps.google.com/?q=%.5f,%.5f',
+        $gps['lat'], $gps['lon'],
+        $gps['accuracy_m'] !== null ? sprintf(' (±%dm)', $gps['accuracy_m']) : '',
+        $gps['lat'], $gps['lon']
     )
     : (trim(($edge['city'] ?? '') . ' ' . ($edge['region'] ?? '') . ' ' . ($edge['country'] ?? '')) ?: 'location unknown');
 
@@ -220,7 +300,18 @@ function post(string $url, $body, array $headers = [], ?string $userpass = null)
 $results = [];
 
 // -- Chris's phone: SMS (works with no data) --------------------------------
-if (!empty($cfg['twilio']['sid']) && !empty($cfg['twilio']['token']) && !empty($cfg['twilio']['sms_to'])) {
+/** True only when every key this channel dereferences is actually present. */
+function ready(array $cfg, string $section, array $keys): bool
+{
+    foreach ($keys as $k) {
+        if (empty($cfg[$section][$k])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+if (ready($cfg, 'twilio', ['sid', 'token', 'sms_from', 'sms_to'])) {
     $t = $cfg['twilio'];
     $results['sms'] = post(
         "https://api.twilio.com/2010-04-01/Accounts/{$t['sid']}/Messages.json",
@@ -231,7 +322,7 @@ if (!empty($cfg['twilio']['sid']) && !empty($cfg['twilio']['token']) && !empty($
 }
 
 // -- Chris's phone: WhatsApp -------------------------------------------------
-if (!empty($cfg['twilio']['sid']) && !empty($cfg['twilio']['whatsapp_to'])) {
+if (ready($cfg, 'twilio', ['sid', 'token', 'whatsapp_from', 'whatsapp_to'])) {
     $t = $cfg['twilio'];
     $results['whatsapp'] = post(
         "https://api.twilio.com/2010-04-01/Accounts/{$t['sid']}/Messages.json",
@@ -242,7 +333,7 @@ if (!empty($cfg['twilio']['sid']) && !empty($cfg['twilio']['whatsapp_to'])) {
 }
 
 // -- Chris's phone: an actual ringing call, so it wakes him --------------------
-if (!empty($cfg['twilio']['sid']) && !empty($cfg['twilio']['call_to'])) {
+if (ready($cfg, 'twilio', ['sid', 'token', 'sms_from', 'call_to'])) {
     $t = $cfg['twilio'];
     $say = '<Response><Say voice="alice">Someone pressed the 911 button on your connect page. '
          . 'Check your phone for the details.</Say></Response>';
@@ -286,8 +377,10 @@ if (!empty($cfg['email_to'])) {
     $results['email'] = ['sent' => @mail($cfg['email_to'], '911 PRESSED on connect.chrislacey.com', $full, $headersMail)];
 }
 
-@file_put_contents(
+log_line(
     $logFile,
-    gmdate('c') . ' delivery ' . json_encode($results, JSON_UNESCAPED_SLASHES) . PHP_EOL,
-    FILE_APPEND | LOCK_EX
+    gmdate('c') . ' delivery ' . json_encode(
+        ['local_log_ok' => $logged, 'channels' => $results],
+        JSON_UNESCAPED_SLASHES
+    ) . PHP_EOL
 );
