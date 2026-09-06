@@ -74,25 +74,36 @@ Two consequences worth knowing before you deploy:
 
 ## Deploy
 
-```sh
-# page
-rsync index.html  connect.chrislacey.com:/var/www/connect/
-
-# redirector + alerting
-rsync go.php alert.php  emergency.chrislacey.com:/var/www/emergency/
-
-# config, once, by hand — never from the repo
-cp contacts.php.example      contacts.php       && $EDITOR contacts.php
-cp alert-config.php.example  alert-config.php   && $EDITOR alert-config.php
-chmod 600 contacts.php alert-config.php
-```
-
-Then check:
+`deploy.sh` copies the files, seeds the config templates if they're missing, and
+verifies the result.
 
 ```sh
-curl -sI "https://emergency.chrislacey.com/go.php?c=whatsapp-call" | head -1   # want 302
-curl -sI "https://emergency.chrislacey.com/go.php?c=nope"          | head -1   # want 404
+# check production without changing anything
+./deploy.sh --check
+
+# deploy
+SSH_HOST=chris@your-web-host \
+CONNECT_DIR=/var/www/connect \
+EMERGENCY_DIR=/var/www/emergency \
+  ./deploy.sh
 ```
+
+On a first run the config files won't exist. The script copies the templates into
+place, then **stops** rather than going live — a blank `contacts.php` would leave
+every button 404ing. Fill them in and re-run:
+
+```sh
+ssh chris@your-web-host $EDITOR /var/www/emergency/contacts.php
+ssh chris@your-web-host $EDITOR /var/www/emergency/alert-config.php
+./deploy.sh --check
+```
+
+`--check` verifies that the page is the current version, that all 19 channel codes
+return 302, that an unknown code 404s, that `alert.php` accepts a beacon, and that
+the alert log is **not** reachable over HTTP — it holds IP addresses and GPS
+positions, so that last one matters.
+
+Existing config is never overwritten, and the real config files are gitignored.
 
 ## Still needs your input
 
