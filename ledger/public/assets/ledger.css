@@ -1,4 +1,4 @@
-/* The Lacey Ledger
+/* Chris Lacey's Dashboard
  *
  * The tokens, type and footer below are the same ones chrislacey.com uses, so
  * this dashboard sits inside the same brand rather than beside it. Everything
@@ -715,6 +715,28 @@ input:focus-visible, select:focus-visible { outline: none; }
 .signin-wrap .header { gap: 18px; }
 .signin-wrap h1 { font-size: 1.9rem; }
 .signin-wrap form { margin-top: 30px; }
+
+
+/* ------------------------------------------------------------- wordmark -- */
+
+/* "Chris Lacey" in the brand blue, "Dashboard" in the primary text colour.
+ * The second half is a token rather than a literal black so it stays readable
+ * on the dark theme, where black on near-black would vanish. */
+.mark-name { color: var(--accent); }
+.mark-word { color: var(--text); }
+
+.footer-mark {
+  margin: 0;
+  margin-right: auto;
+  font-family: "Fraunces", ui-serif, Georgia, serif;
+  font-weight: 560;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .footer-mark { font-size: 0.82rem; }
+}
 
 /* ------------------------------------------------------------------ footer */
 

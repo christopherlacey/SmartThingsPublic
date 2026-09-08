@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# deploy.sh — push The Lacey Ledger to the web host and verify it.
+# deploy.sh — push Chris Lacey's Dashboard to the web host and verify it.
 #
 #   ./deploy.sh --check     verify the live site only, change nothing
 #   ./deploy.sh             deploy, then verify

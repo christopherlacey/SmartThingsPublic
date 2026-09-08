@@ -1,4 +1,4 @@
-/* Interaction for The Lacey Ledger. */
+/* Interaction for Chris Lacey's Dashboard. */
 
 (function () {
   "use strict";

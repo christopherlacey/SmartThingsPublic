@@ -1,4 +1,4 @@
--- The Lacey Ledger — schema
+-- Chris Lacey's Dashboard — schema
 --
 -- One SQLite file holds everything. It contains medical, financial and personal
 -- records, so it lives OUTSIDE the web root (see config.php: LEDGER_DB) and the

@@ -1,6 +1,6 @@
 <?php
 /**
- * The Lacey Ledger — configuration.
+ * Chris Lacey's Dashboard — configuration.
  *
  * Copy to config.php, fill in, and keep it out of the web root and out of git.
  *   cp config.php.example config.php && chmod 600 config.php

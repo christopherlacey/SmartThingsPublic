@@ -1,4 +1,4 @@
-/* Charts for The Lacey Ledger.
+/* Charts for Chris Lacey's Dashboard.
  *
  * Hand-rolled SVG rather than a charting library: the page runs under a strict
  * CSP with no third-party script origin, and every form this dashboard needs

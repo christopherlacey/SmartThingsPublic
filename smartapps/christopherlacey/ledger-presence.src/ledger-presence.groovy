@@ -29,7 +29,7 @@ definition(
     name: "Ledger Presence",
     namespace: "christopherlacey",
     author: "Chris Lacey",
-    description: "Tell the Lacey Ledger when you arrive at or leave a place, so its dashboard knows where you are.",
+    description: "Tell Chris Lacey's Dashboard when you arrive at or leave a place, so it knows where you are.",
     category: "My Apps",
     iconUrl: "https://s3.amazonaws.com/smartapp-icons/Meta/life360.png",
     iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Meta/life360@2x.png"

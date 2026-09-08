@@ -1,4 +1,4 @@
-# The Lacey Ledger — c.lacey.me
+# Chris Lacey's Dashboard — c.lacey.me
 
 A private dashboard: where you are, what's on today, what needs buying, and the
 health and money records behind it.

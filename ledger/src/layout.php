@@ -19,6 +19,25 @@ const LEDGER_TABS = [
     ['changelog.php', 'Change log', 'changelog'],
 ];
 
+/**
+ * The wordmark.
+ *
+ * "Chris Lacey" wears the brand blue and "Dashboard" wears the primary text
+ * colour — black on the light theme, and the light ink on the dark one, since a
+ * literal black would disappear against a dark background. Both are tokens, so
+ * the mark follows the theme instead of being repainted by hand.
+ */
+function brand_mark(): string
+{
+    return '<span class="mark-name">Chris Lacey&rsquo;s</span> <span class="mark-word">Dashboard</span>';
+}
+
+/** The same name as plain text, for <title> and anywhere markup won't do. */
+function brand_text(): string
+{
+    return "Chris Lacey's Dashboard";
+}
+
 function page_head(string $title, string $tab): void
 {
     $portrait = cfg('portrait', 'assets/chris-lacey-headshot-2026.png');
@@ -29,7 +48,7 @@ function page_head(string $title, string $tab): void
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="light dark">
-<title><?= h($title) ?> — The Lacey Ledger</title>
+<title><?= h($title) ?> — <?= h(brand_text()) ?></title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,440;9..144,520;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -74,6 +93,7 @@ function page_footer(): void
     ?>
   <footer>
     <img src="<?= h($portrait) ?>" alt="<?= h(cfg('owner_name', 'Chris')) ?>">
+    <p class="footer-mark"><?= brand_mark() ?></p>
     <div class="footer-links">
       <a class="footer-emergency" href="<?= h(cfg('emergency_url', 'https://emergency.chrislacey.com')) ?>">Emergency</a>
       <a class="footer-privacy" href="<?= h(cfg('privacy_url', 'https://privacy.chrislacey.com')) ?>">Privacy</a>
