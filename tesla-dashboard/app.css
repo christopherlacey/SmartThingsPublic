@@ -1,0 +1,590 @@
+/* ---------------------------------------------------------------------------
+   Lacey Dashboard — styling for the Tesla Model X centre screen.
+
+   Target: 17" landscape, ~1920x1200 (MCU2) to 2200x1300 (MCU3), Chromium-based
+   Tesla browser, touch only. Three rules follow from that and explain most of
+   the choices below:
+
+     1. No hover. Every affordance is visible without pointing at it, and
+        :hover only ever *repeats* what :active and the resting state say.
+     2. No scrolling in the primary view. The rail and each tab are sized to
+        fit one screen; only long medical notes scroll, and they scroll inside
+        their own panel rather than moving the page.
+     3. Nothing subtle. Read at arm's length, in sunlight, at a glance. Body
+        text bottoms out around 17px and touch targets around 64px.
+
+   Deliberately avoided for older MCU2 Chromium: :has(), nesting, backdrop-filter
+   (costs frames on this GPU), and container queries.
+--------------------------------------------------------------------------- */
+
+:root {
+  /* Carried over from connect.chrislacey.com so the two sites feel related. */
+  --ink:    #0a0a0a;
+  --mid:    #141414;
+  --card:   #171717;
+  --card-2: #1c1c1c;
+  --rule:   #262626;
+  --rule-2: #333333;
+  --paper:  #f5f2ee;
+  --muted:  rgba(245, 242, 238, 0.58);
+  --dim:    rgba(245, 242, 238, 0.34);
+
+  --accent: #0EA5E9;
+  --urgent: #b4544c;
+  --warn:   #d99a4e;
+  --ok:     #4ade80;
+
+  --display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --body:    'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --radius: 14px;
+  --tap:    64px;          /* minimum comfortable touch target in a moving car */
+  --rail-w: 25rem;
+  --gap:    0.85rem;
+
+  /* Fallback; each person's real colour is set inline from data.json. */
+  --person: var(--accent);
+}
+
+* { box-sizing: border-box; }
+
+html {
+  /* One knob scales the whole dashboard across MCU2 and MCU3 screen sizes. */
+  font-size: clamp(15px, 0.86vw + 7px, 20px);
+  -webkit-text-size-adjust: 100%;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;                 /* the page never scrolls; panels do */
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--body);
+  font-weight: 300;
+  line-height: 1.5;
+  overscroll-behavior: none;        /* no rubber-band bounce under a fingertip */
+}
+
+body {
+  /* Touch-only device: kill the 300ms tap delay and the long-press callout. */
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Scrollbars inside panels: visible enough to signal "there is more", thin
+   enough not to eat layout. */
+.scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.scroll::-webkit-scrollbar { width: 10px; }
+.scroll::-webkit-scrollbar-track { background: transparent; }
+.scroll::-webkit-scrollbar-thumb { background: var(--rule-2); border-radius: 5px; }
+
+/* ------------------------------------------------------------------ shell -- */
+
+#app {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+  padding: 0.7rem 0.9rem 0.9rem;
+  gap: var(--gap);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--rule);
+  flex: none;
+}
+
+.brand {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.brand span { color: var(--accent); }
+
+.clock {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  white-space: nowrap;
+}
+.clock .t {
+  font-size: 1.7rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.clock .d { font-size: 0.95rem; color: var(--muted); }
+
+/* Tabs sit right of centre so they fall under the driver's hand, not the
+   passenger's. */
+.tabs { display: flex; gap: 0.5rem; margin-left: auto; flex: none; }
+
+.tab {
+  min-height: var(--tap);
+  min-width: 8.5rem;
+  padding: 0 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-family: var(--body);
+  font-size: 1.02rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.tab:active { background: var(--card-2); }
+.tab[aria-selected="true"] {
+  background: var(--card-2);
+  border-color: var(--accent);
+  color: var(--paper);
+  font-weight: 500;
+}
+
+.sync {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--dim);
+  white-space: nowrap;
+  min-width: 7.5rem;
+  justify-content: flex-end;
+}
+.sync .dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--ok);
+  flex: none;
+}
+.sync.stale .dot { background: var(--warn); }
+.sync.error .dot { background: var(--urgent); }
+.sync.error { color: var(--urgent); }
+
+main {
+  display: grid;
+  grid-template-columns: var(--rail-w) 1fr;
+  gap: var(--gap);
+  min-height: 0;                    /* lets the grid children own the scroll */
+}
+
+/* ------------------------------------------------------------- people rail -- */
+
+#rail {
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  gap: var(--gap);
+  min-height: 0;
+}
+
+.person {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--person);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  min-height: 0;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.person:active { background: var(--card-2); }
+.person.focused { background: var(--card-2); border-color: var(--person); border-left-color: var(--person); }
+
+.person .who {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.55rem;
+}
+.person .avatar {
+  width: 2.3rem; height: 2.3rem;
+  border-radius: 50%;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: var(--person);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 1.05rem;
+  font-family: var(--display);
+}
+.person .name {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 1.2rem;
+  letter-spacing: -0.01em;
+}
+.person .role { font-size: 0.8rem; color: var(--dim); margin-left: auto; text-align: right; }
+
+/* Location is the headline of each card — biggest thing after the name. */
+/* margin-top:auto here and on .now splits the card's free space between them,
+   so the location block settles optically centred instead of leaving a hole
+   above a bottom-pinned Now/Next. */
+.person .place {
+  margin-top: auto;
+  font-size: 1.5rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  margin-bottom: 0.15rem;
+}
+.person .place-detail {
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin-bottom: 0.1rem;
+}
+.person .fix {
+  font-size: 0.78rem;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.person .fix.stale { color: var(--warn); }
+
+.person .now {
+  margin-top: auto;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--rule);
+}
+.nowline { display: flex; gap: 0.6rem; align-items: baseline; margin-top: 0.3rem; }
+.nowline .tag {
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--dim);
+  flex: none;
+  width: 3.1rem;
+}
+.nowline .txt {
+  font-size: 0.97rem;
+  color: var(--paper);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nowline.is-now .txt { color: var(--person); font-weight: 400; }
+.nowline .txt .at { color: var(--muted); }
+.nowline.empty .txt { color: var(--dim); }
+
+/* A red medical flag on the rail card — the one thing that should interrupt
+   a glance. Only set when that person has a severe allergy or an alert note. */
+.person .flag {
+  position: absolute;
+  top: 0.9rem; right: 1rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--urgent);
+  border: 1px solid var(--urgent);
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+}
+
+/* ------------------------------------------------------------------ panel -- */
+
+#panel {
+  position: relative;
+  background: var(--mid);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  min-height: 0;
+  overflow: hidden;
+}
+.view { display: none; height: 100%; min-height: 0; }
+.view.active { display: block; }
+
+/* --- map ---------------------------------------------------------------- */
+
+#view-map { position: relative; }
+#map { position: absolute; inset: 0; background: var(--mid); }
+
+/* Leaflet's own chrome, restyled dark and enlarged for touch. */
+.leaflet-container { background: #0d0d0d; font-family: var(--body); }
+.leaflet-control-zoom a {
+  width: 46px !important; height: 46px !important;
+  line-height: 46px !important;
+  font-size: 24px !important;
+  background: var(--card) !important;
+  color: var(--paper) !important;
+  border-color: var(--rule) !important;
+}
+.leaflet-bar { border: 1px solid var(--rule) !important; }
+.leaflet-control-attribution {
+  background: rgba(10, 10, 10, 0.75) !important;
+  color: var(--dim) !important;
+  font-size: 10px !important;
+}
+.leaflet-control-attribution a { color: var(--muted) !important; }
+
+.pin {
+  display: grid;
+  place-items: center;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 15px;
+  font-family: var(--display);
+  border: 2px solid rgba(10, 10, 10, 0.85);
+  /* The ring takes its colour from --ring, not currentColor: currentColor is
+     needed for the initial itself, and using one for both made the letter the
+     same colour as the pin it sits on. */
+  box-shadow: 0 0 0 2px var(--ring, #0EA5E9);
+}
+
+/* Floating legend: who is which colour, and the exact fix behind each pin. */
+.map-legend {
+  position: absolute;
+  left: 0.85rem; bottom: 0.85rem;
+  z-index: 500;
+  background: rgba(10, 10, 10, 0.88);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.9rem;
+  display: grid;
+  gap: 0.5rem;
+  max-width: 22rem;
+}
+.legend-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.85rem; }
+.legend-row .swatch { width: 12px; height: 12px; border-radius: 50%; background: var(--person); flex: none; }
+.legend-row .lname { font-weight: 400; min-width: 3.6rem; }
+.legend-row .lcoord { color: var(--dim); font-variant-numeric: tabular-nums; font-size: 0.78rem; }
+
+.map-recenter {
+  position: absolute;
+  right: 0.85rem; bottom: 0.85rem;
+  z-index: 500;
+  min-height: var(--tap);
+  padding: 0 1.3rem;
+  background: rgba(10, 10, 10, 0.88);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  color: var(--paper);
+  font-family: var(--body);
+  font-size: 1rem;
+  cursor: pointer;
+}
+.map-recenter:active { background: var(--card-2); }
+
+/* Shown instead of the map when Leaflet or its tiles can't load — an LTE
+   dropout in the car must degrade to the coordinates, not to a blank box. */
+.map-fallback {
+  position: absolute; inset: 0;
+  display: none;
+  padding: 1.5rem;
+  grid-template-rows: auto 1fr;
+  gap: 1rem;
+  align-content: start;
+}
+.map-fallback.show { display: grid; }
+.fallback-on .map-legend,
+.fallback-on .map-recenter { display: none; }
+.map-fallback h3 {
+  font-family: var(--display); font-weight: 600; font-size: 1.15rem; margin: 0;
+}
+.map-fallback .why { color: var(--muted); font-size: 0.9rem; margin: 0.25rem 0 0; }
+.fallback-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); align-content: start; }
+
+/* --- day ---------------------------------------------------------------- */
+
+#view-day, #view-medical { padding: 1rem; }
+
+.cols {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap);
+  height: 100%;
+  min-height: 0;
+}
+.cols.single { grid-template-columns: 1fr; }
+
+.col {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--person);
+  border-radius: var(--radius);
+  min-height: 0;
+  overflow: hidden;
+}
+.col > h3 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex: none;
+}
+.col > h3 .sub { font-family: var(--body); font-size: 0.8rem; color: var(--dim); font-weight: 300; margin-left: auto; }
+.col-body { padding: 0.75rem; min-height: 0; }
+
+.evt {
+  display: grid;
+  grid-template-columns: 5.4rem 1fr;
+  gap: 0.8rem;
+  padding: 0.6rem 0.65rem;
+  border-radius: 10px;
+  border-left: 3px solid var(--rule-2);
+  margin-bottom: 0.45rem;
+  background: var(--card-2);
+}
+.evt .when {
+  font-size: 0.86rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+.evt .what { font-size: 1rem; line-height: 1.35; }
+.evt .where { font-size: 0.82rem; color: var(--muted); margin-top: 0.15rem; }
+.evt .note { font-size: 0.8rem; color: var(--dim); margin-top: 0.2rem; }
+
+.evt.past { opacity: 0.42; }
+.evt.current { border-left-color: var(--person); background: #202020; }
+.evt.current .what { font-weight: 500; }
+.evt.next { border-left-color: var(--rule-2); }
+.evt.kind-medical { border-left-color: var(--urgent); }
+.evt .badge {
+  display: inline-block;
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  margin-left: 0.5rem;
+  vertical-align: 0.12em;
+  border: 1px solid currentColor;
+}
+.evt.current .badge { color: var(--person); }
+.evt.next .badge { color: var(--muted); }
+.evt.kind-medical .badge { color: var(--urgent); }
+
+.empty-note { color: var(--dim); font-size: 0.92rem; padding: 0.9rem 0.65rem; }
+
+/* --- medical ------------------------------------------------------------ */
+
+.med-section { margin-bottom: 0.9rem; }
+.med-section > h4 {
+  font-size: 0.7rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin: 0 0 0.4rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--rule);
+  font-weight: 400;
+}
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.chip {
+  font-size: 0.88rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 8px;
+  background: var(--card-2);
+  border: 1px solid var(--rule-2);
+}
+.chip.severe { background: rgba(180, 84, 76, 0.16); border-color: var(--urgent); color: #f0b3ad; }
+.chip.big { font-size: 1.05rem; padding: 0.35rem 0.75rem; }
+
+.med-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(38, 38, 38, 0.7);
+}
+.med-row:last-child { border-bottom: 0; }
+.med-row .m-name { font-size: 0.97rem; }
+.med-row .m-meta { font-size: 0.82rem; color: var(--muted); text-align: right; white-space: nowrap; }
+.med-row .m-note { grid-column: 1 / -1; font-size: 0.8rem; color: var(--dim); }
+
+/* Provider / pharmacy / emergency numbers are tap-to-dial. In a car that is
+   the single most useful control on the medical tab, so it gets a full-size
+   touch target rather than an inline link. */
+a.call {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  min-height: 52px;
+  padding: 0.5rem 0.8rem;
+  margin-bottom: 0.35rem;
+  background: var(--card-2);
+  border: 1px solid var(--rule-2);
+  border-radius: 10px;
+  color: var(--paper);
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+a.call:active { background: #232323; border-color: var(--person); }
+a.call .c-role { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); display: block; }
+a.call .c-num { color: var(--person); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.note-p { font-size: 0.9rem; color: var(--muted); line-height: 1.55; margin: 0 0 0.5rem; }
+
+/* --------------------------------------------------------------- setup/err -- */
+
+#setup {
+  position: fixed; inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--ink);
+  z-index: 9000;
+  padding: 2rem;
+}
+#setup[hidden] { display: none; }
+.setup-card {
+  max-width: 44rem;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--warn);
+  border-radius: var(--radius);
+  padding: 1.75rem 2rem;
+}
+.setup-card h2 { font-family: var(--display); font-weight: 600; margin: 0 0 0.6rem; font-size: 1.4rem; }
+.setup-card p { color: var(--muted); line-height: 1.6; margin: 0 0 0.8rem; }
+.setup-card code {
+  background: var(--card-2);
+  border: 1px solid var(--rule-2);
+  border-radius: 6px;
+  padding: 0.12rem 0.4rem;
+  font-size: 0.9em;
+}
+
+/* ---------------------------------------------------------------- narrow -- */
+/* Phone or portrait preview: the rail stops being a rail and the whole thing
+   becomes one scrolling column. Not the target device, but the page should
+   never be broken when it's opened off the car screen to check something. */
+@media (max-width: 1100px) {
+  html, body { overflow: auto; }
+  #app { height: auto; min-height: 100%; }
+  header { flex-wrap: wrap; row-gap: 0.6rem; }
+  .tabs { margin-left: 0; width: 100%; }
+  .tab { flex: 1; min-width: 0; padding: 0 0.5rem; font-size: 0.9rem; }
+  .sync { min-width: 0; }
+  main { grid-template-columns: 1fr; }
+  #rail { grid-template-rows: none; }
+  #panel { min-height: 34rem; }
+  .cols { grid-template-columns: 1fr; height: auto; }
+  .fallback-grid { grid-template-columns: 1fr; }
+}

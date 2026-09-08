@@ -1,0 +1,154 @@
+{
+  "_readme": [
+    "Copy this file to data.json in the same directory, then replace every value.",
+    "data.json is gitignored on purpose: this repository is a PUBLIC fork on GitHub,",
+    "so anything committed here is published whether or not the website is.",
+    "Every string marked REPLACE is placeholder text, not real information.",
+    "The dashboard re-reads this file every meta.refreshSeconds with no redeploy,",
+    "so a cron job or a Shortcut can rewrite it in place and the car picks it up."
+  ],
+
+  "meta": {
+    "refreshSeconds": 120,
+    "staleMinutes": 20,
+    "generated": "2026-09-08T07:00:00-04:00"
+  },
+
+  "people": [
+    {
+      "id": "chris",
+      "name": "Chris",
+      "initials": "C",
+      "role": "REPLACE",
+      "color": "#0EA5E9",
+
+      "location": {
+        "lat": 40.74128,
+        "lon": -73.98965,
+        "place": "REPLACE — e.g. Home",
+        "detail": "REPLACE — e.g. Arrived 8:15 AM",
+        "status": "stationary",
+        "speedMph": 0,
+        "updated": "2026-09-08T09:12:00-04:00"
+      },
+
+      "schedule": [
+        { "start": "09:00", "end": "09:30", "title": "REPLACE — example event", "where": "REPLACE", "kind": "work" },
+        { "start": "11:00", "end": "12:00", "title": "REPLACE — example event", "where": "REPLACE", "kind": "work", "note": "REPLACE — optional note" },
+        { "start": "15:30", "end": "16:15", "title": "REPLACE — example appointment", "where": "REPLACE", "kind": "medical" }
+      ],
+
+      "medical": {
+        "alert": "",
+        "bloodType": "REPLACE",
+        "organDonor": null,
+        "allergies": [
+          { "what": "REPLACE — example allergen", "severity": "mild", "reaction": "REPLACE" }
+        ],
+        "conditions": [
+          { "name": "REPLACE — example condition", "since": "REPLACE", "notes": "REPLACE" }
+        ],
+        "medications": [
+          { "name": "REPLACE — example medication", "dose": "REPLACE", "schedule": "REPLACE", "note": "REPLACE — optional" }
+        ],
+        "devices": [],
+        "appointments": [
+          { "what": "REPLACE — example upcoming visit", "when": "REPLACE", "where": "REPLACE" }
+        ],
+        "providers": [
+          { "role": "Primary care", "name": "REPLACE", "phone": "REPLACE" }
+        ],
+        "pharmacy": { "name": "REPLACE", "phone": "REPLACE", "address": "REPLACE" },
+        "emergency": [
+          { "relation": "REPLACE", "name": "REPLACE", "phone": "REPLACE" }
+        ],
+        "notes": [
+          "REPLACE — free-text notes. One string per paragraph."
+        ]
+      }
+    },
+
+    {
+      "id": "john",
+      "name": "John",
+      "initials": "J",
+      "role": "REPLACE",
+      "color": "#34D399",
+
+      "location": {
+        "lat": 40.75519,
+        "lon": -73.98416,
+        "place": "REPLACE",
+        "detail": "REPLACE",
+        "status": "moving",
+        "speedMph": 32,
+        "updated": "2026-09-08T09:15:00-04:00"
+      },
+
+      "schedule": [
+        { "start": "08:30", "end": "15:00", "title": "REPLACE — example event", "where": "REPLACE", "kind": "work" }
+      ],
+
+      "medical": {
+        "alert": "",
+        "bloodType": "REPLACE",
+        "organDonor": null,
+        "allergies": [],
+        "conditions": [],
+        "medications": [],
+        "devices": [],
+        "appointments": [],
+        "providers": [
+          { "role": "Primary care", "name": "REPLACE", "phone": "REPLACE" }
+        ],
+        "pharmacy": null,
+        "emergency": [
+          { "relation": "REPLACE", "name": "REPLACE", "phone": "REPLACE" }
+        ],
+        "notes": []
+      }
+    },
+
+    {
+      "id": "addy",
+      "name": "Addy",
+      "initials": "A",
+      "role": "REPLACE",
+      "color": "#F472B6",
+
+      "location": {
+        "lat": 40.72890,
+        "lon": -74.00195,
+        "place": "REPLACE",
+        "detail": "REPLACE",
+        "status": "stationary",
+        "speedMph": 0,
+        "updated": "2026-09-08T09:05:00-04:00"
+      },
+
+      "schedule": [
+        { "start": "08:00", "end": "14:45", "title": "REPLACE — example event", "where": "REPLACE", "kind": "school" },
+        { "start": "16:00", "end": "17:30", "title": "REPLACE — example activity", "where": "REPLACE", "kind": "personal" }
+      ],
+
+      "medical": {
+        "alert": "",
+        "bloodType": "REPLACE",
+        "organDonor": null,
+        "allergies": [],
+        "conditions": [],
+        "medications": [],
+        "devices": [],
+        "appointments": [],
+        "providers": [
+          { "role": "Pediatrician", "name": "REPLACE", "phone": "REPLACE" }
+        ],
+        "pharmacy": null,
+        "emergency": [
+          { "relation": "REPLACE", "name": "REPLACE", "phone": "REPLACE" }
+        ],
+        "notes": []
+      }
+    }
+  ]
+}

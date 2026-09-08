@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!-- viewport-fit=cover: the Tesla browser insets its viewport behind the
+     surrounding UI chrome unless told otherwise. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive, noimageindex">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0a0a'/%3E%3Ccircle cx='11' cy='12' r='3.4' fill='%230EA5E9'/%3E%3Ccircle cx='21' cy='15' r='3.4' fill='%2334D399'/%3E%3Ccircle cx='15' cy='22' r='3.4' fill='%23F472B6'/%3E%3C/svg%3E">
+<title>Lacey Dashboard</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<!-- Leaflet 1.9.4, vendored rather than pulled from a CDN: the car is on LTE,
+     and a CDN miss would take the map out precisely when it is least convenient. -->
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<div id="app">
+
+  <header>
+    <div class="brand">Lacey <span>Dashboard</span></div>
+
+    <div class="clock">
+      <span class="t" id="clock-time">--:--</span>
+      <span class="d" id="clock-date"></span>
+    </div>
+
+    <nav class="tabs" role="tablist" aria-label="Dashboard sections">
+      <button class="tab" id="tab-map"     role="tab" aria-selected="true"  aria-controls="view-map">Map</button>
+      <button class="tab" id="tab-day"     role="tab" aria-selected="false" aria-controls="view-day">Today</button>
+      <button class="tab" id="tab-medical" role="tab" aria-selected="false" aria-controls="view-medical">Medical</button>
+    </nav>
+
+    <div class="sync" id="sync">
+      <span class="dot" aria-hidden="true"></span>
+      <span id="sync-text">Loading…</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Always-visible rail: who is where, and what they're doing right now.
+         Tapping a card focuses the panel on that one person. -->
+    <aside id="rail" aria-label="People"></aside>
+
+    <section id="panel">
+
+      <div class="view active" id="view-map" role="tabpanel" aria-labelledby="tab-map">
+        <div id="map"></div>
+
+        <div class="map-legend" id="map-legend"></div>
+        <button class="map-recenter" id="recenter">Show everyone</button>
+
+        <!-- Stands in for the map when Leaflet or its tiles can't be reached. -->
+        <div class="map-fallback" id="map-fallback">
+          <div>
+            <h3>Map unavailable</h3>
+            <p class="why">The map library or its tiles couldn't be reached — likely no signal.
+               Positions below are still live.</p>
+          </div>
+          <div class="fallback-grid" id="fallback-grid"></div>
+        </div>
+      </div>
+
+      <div class="view" id="view-day" role="tabpanel" aria-labelledby="tab-day">
+        <div class="cols" id="day-cols"></div>
+      </div>
+
+      <div class="view" id="view-medical" role="tabpanel" aria-labelledby="tab-medical">
+        <div class="cols" id="med-cols"></div>
+      </div>
+
+    </section>
+  </main>
+
+</div>
+
+<!-- Shown only when data.json has never loaded. A blank dark screen in the car
+     gives you nothing to act on; this names the actual problem. -->
+<div id="setup" hidden>
+  <div class="setup-card">
+    <h2>No data yet</h2>
+    <p>The dashboard loaded, but <code>data.json</code> couldn't be read. Copy
+       <code>data.example.json</code> to <code>data.json</code> in this same
+       directory and fill it in.</p>
+    <p>Error: <code id="setup-detail"></code></p>
+  </div>
+</div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
