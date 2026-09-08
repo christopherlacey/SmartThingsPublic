@@ -7,39 +7,36 @@ health and money records behind it.
 
 ## Read this first
 
-**The site this replaces had no sign-in.** Every page answered anonymous
-requests with the full record. From an ordinary cloud container, with no
-cookie, no password and no special access:
+**This rebuild exists because the version it replaces has no authentication.**
+Its pages answer requests without a session, so the records behind them are
+readable by anyone who reaches the host. That is the problem this branch is
+here to fix, and it is not fixed by merging — only by deploying.
 
-```
-GET https://c.lacey.me/index.php        200 — the day's brief, 22 named people and their cities
-GET https://c.lacey.me/person.php?id=13 200 — 42 KB, "Chris Lacey — Everything on file"
-GET https://c.lacey.me/people.php       200
-GET https://c.lacey.me/changelog.php    200 — 83 KB of change history
-```
+Specifics are deliberately kept out of this file. This repository is a fork of a
+public project, so everything in it is world-readable, and a precise write-up of
+a live weakness on a running site does not belong somewhere anyone can read it
+before the site is fixed. If you need the detail, it is in the session that
+produced this branch.
 
-There was no `login.php` at all, and no `<form>`, `password`, or `session`
-anywhere in the markup. So the brief for this rebuild — "the login structure is
-perfectly fine, just let me reveal the password" — did not match what was
-running: there was no login to keep.
+That also changed what the original brief meant. The request was "the login
+structure is fine, just let me reveal the password" — but there was no login to
+keep. So this **builds** the sign-in rather than modifying one, and the
+password-reveal control that was asked for is on it.
 
-That changes what "add a reveal toggle" means. This rebuild **builds** the
-sign-in rather than modifying one, and the reveal toggle asked for is on it.
-Two things follow that are worth doing regardless of what happens to this code:
+Two things follow:
 
-1. **Treat everything that was on the old site as disclosed.** It was reachable
-   by anyone who knew the hostname, for as long as it was up, and it was
-   `noindex` but not access-controlled. Names, cities and personal fields for 22
-   people were in it.
-2. **The old pages stay exposed until this replaces them.** That is the chosen
-   plan, and it means the deploy is the fix — deploying this *alongside* the old
-   pages fixes nothing while `index.php` still answers anonymously. Overwrite
-   them, don't sit beside them, and import before you overwrite (see below —
-   the importer reads those same pages).
+1. **Treat what was reachable as disclosed.** It was served to anyone who knew
+   the hostname, for as long as it was up. That includes records about people
+   other than you.
+2. **Deploying is the fix, and the order matters.** The importer reads the old
+   pages, so import before you overwrite them. Deploying *alongside* the old
+   pages fixes nothing.
 
-`./deploy.sh --check` tests exactly this: it fails if any page returns 200 to an
-anonymous request. Run it right after the deploy; a pass is the moment the
-exposure actually closes.
+`./deploy.sh --check` is the test that this actually closed: it fails if any
+page returns 200 to an anonymous request, if the config, database or `src/` is
+fetchable, if HSTS is missing, or if the session cookie lacks HttpOnly, Secure
+or SameSite. Run it straight after the deploy — a pass is the moment the
+exposure ends.
 
 ---
 
