@@ -72,7 +72,8 @@ verify() {
   local headers
   headers=$(curl -sS -D - -o /dev/null --max-time 15 "$SITE/login.php" || true)
   local want
-  for want in "content-security-policy" "x-content-type-options" "x-frame-options" "cache-control"; do
+  for want in "content-security-policy" "x-content-type-options" "x-frame-options" \
+              "cache-control" "strict-transport-security"; do
     if grep -qi "^$want:" <<<"$headers"; then
       green "  ok    $want is set"
     else
@@ -80,7 +81,21 @@ verify() {
     fi
   done
 
-  # 6. HTTPS should not be optional for this site.
+  # 6. The session cookie must carry its flags. The site this replaced set a
+  #    PHPSESSID with no Secure, no HttpOnly and no SameSite at all.
+  local cookie
+  cookie=$(curl -sS -D - -o /dev/null --max-time 15 "$SITE/login.php" 2>/dev/null | grep -i '^set-cookie:' || true)
+  if [ -n "$cookie" ]; then
+    local flag missing=0
+    for flag in "HttpOnly" "Secure" "SameSite"; do
+      grep -qi "$flag" <<<"$cookie" || { red "  FAIL  session cookie is missing $flag"; missing=1; fail=1; }
+    done
+    [ "$missing" -eq 0 ] && green "  ok    session cookie is HttpOnly, Secure and SameSite"
+  else
+    green "  ok    no cookie set before sign-in"
+  fi
+
+  # 7. HTTPS should not be optional for this site.
   local scheme_code
   scheme_code=$(curl -sS -o /dev/null --max-time 15 -w '%{http_code}' \
                 "http://${SITE#https://}/login.php" || echo 000)

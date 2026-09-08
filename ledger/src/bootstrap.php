@@ -87,6 +87,17 @@ function ledger_send_headers(): void
 
     // A private ledger has no business in a search index.
     header('X-Robots-Tag: noindex, nofollow, noarchive');
+
+    // Tell the browser never to try this host over plain HTTP again. Without
+    // it, the first request of every visit is an unencrypted one that a network
+    // attacker can answer instead of the server.
+    //
+    // No includeSubDomains: this is one host among several on lacey.me, and
+    // committing every sibling to HTTPS-only is not a decision to make from
+    // here. No preload either — preload is effectively irreversible.
+    if (cfg('require_https', true)) {
+        header('Strict-Transport-Security: max-age=31536000');
+    }
 }
 
 /**
