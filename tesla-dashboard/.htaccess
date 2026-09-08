@@ -1,0 +1,41 @@
+# Served from an unlisted path, so the job here is to stop the path leaking and
+# to stop anything on it being cached or indexed.
+
+# Without this, a request to the parent directory can list the secret path
+# straight back to whoever asked — which would defeat the point of it.
+Options -Indexes
+
+<IfModule mod_headers.c>
+  # noindex as a header too, not just a meta tag: the meta tag does nothing for
+  # data.json, which is a plain file a crawler would happily take.
+  Header set X-Robots-Tag "noindex, nofollow, noarchive, noimageindex"
+
+  # Don't let the URL travel to any third party in a Referer.
+  Header set Referrer-Policy "no-referrer"
+
+  Header set X-Content-Type-Options "nosniff"
+
+  # This page holds live positions and medical records. Nothing about it should
+  # sit in a shared cache, and the car must never render a stale data.json.
+  <FilesMatch "\.(json|html)$">
+    Header set Cache-Control "no-store, no-cache, must-revalidate, private"
+    Header set Pragma "no-cache"
+  </FilesMatch>
+
+  # The vendored library is immutable and safe to cache hard.
+  <FilesMatch "\.(js|css|png)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+  <FilesMatch "^(app\.js|app\.css)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
+
+<IfModule mod_mime.c>
+  AddType application/json .json
+</IfModule>
+
+# The example file is only a schema, but there is no reason to serve it.
+<Files "data.example.json">
+  Require all denied
+</Files>

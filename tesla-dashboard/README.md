@@ -3,7 +3,8 @@
 A single-screen dashboard for the Model X centre display: where Chris, John and
 Addy each are, what each of them has on today, and their medical information.
 
-Target URL: `https://lacey.me/Tesla-Model-X-Dashboard/`
+Target URL: `https://grok.lacey.me/TmX$23!/` — an unlisted path, which is the
+only thing standing between this page and the open internet.
 
 ## Files
 
@@ -14,6 +15,7 @@ Target URL: `https://lacey.me/Tesla-Model-X-Dashboard/`
 | `app.js` | Behaviour: fetch, render, refresh, map. |
 | `data.example.json` | The data schema, with placeholder values. Copy to `data.json`. |
 | `vendor/leaflet/` | Leaflet 1.9.4, self-hosted (BSD-2-Clause, see its `LICENSE`). |
+| `.htaccess` | Stops the path leaking: no directory listing, no caching, no indexing. |
 | `deploy.sh` | Copies the site to the web host, then verifies it. |
 
 `data.json` holds the real information and is **gitignored**. Keep it that way:
@@ -109,34 +111,56 @@ the car never fetches a half-written JSON.
 ./deploy.sh --check
 
 # deploy
-SSH_HOST=chris@your-web-host \
-DASH_DIR=/var/www/lacey.me/Tesla-Model-X-Dashboard \
-  ./deploy.sh
+SSH_HOST=myfsdev@lacey.me ./deploy.sh
 ```
+
+The docroot and URL default to `grok.lacey.me` and the unlisted path; override
+`BASE_URL` to move it, and the docroot follows automatically.
+
+The secret path contains `$` and `!`. Both are legal in a URL and on disk, but
+they are exactly the characters a shell will eat, so `SECRET_PATH` is
+single-quoted in `deploy.sh` and every remote path is single-quoted again for
+the far side. In double quotes bash reads `"TmX$23!"` as `TmX3!` and deploys to
+the wrong directory without complaining. Don't "tidy" those quotes.
+
+The script refuses to deploy to any host that isn't `lacey.me` or
+`chrislacey.com` unless you pass `CONFIRM_DOMAIN=yes`, because sending this
+particular payload to the wrong domain isn't a recoverable mistake.
 
 `data.json` on the server is never overwritten. On a first deploy the script
 copies the example into place and stops, so you can fill it in before the car
 shows a screen full of `REPLACE`.
 
 `--check` verifies the page is the current version, that `app.css`, `app.js` and
-the vendored Leaflet all return 200, that `data.json` is reachable and parses,
-and that it no longer contains placeholder values.
+the vendored Leaflet all return 200, that `data.json` is reachable, parses and
+no longer contains placeholder values, and — most importantly — that the parent
+directory does not hand the secret path back to anyone who asks for it.
 
-## Before this goes public
+## What protects this, and what doesn't
 
-The URL is unlisted and carries `noindex`, but that only deters search engines,
-not people. As published, anyone who has or guesses the URL can read all three
-people's exact live coordinates and full medical records.
+There is no login. The unlisted path *is* the access control, so everything
+that could reveal the path is a way in. `.htaccess` closes the ones on our
+side — directory listing off, `no-store` on the HTML and JSON, `X-Robots-Tag`
+so a crawler that finds `data.json` directly won't index it — and the page
+sends `Referrer-Policy: no-referrer` so the URL doesn't travel to the tile
+server or Google Fonts.
 
-Two things are worth deciding deliberately rather than by default:
+What that still leaves:
 
+- **`TmX$23!` is seven human-chosen characters.** It stops casual discovery and
+  search engines. It is not a password, and it doesn't survive being written
+  down, screenshotted with the URL bar visible, or read off the car screen by a
+  passenger.
+- **`data.json` is world-readable to anyone with the path** — the page fetches
+  it client-side, so it has to be. That single file is every position and every
+  medical record, in plain JSON, ready to copy.
+- **It can't be taken back.** Once the path is out, rotating it doesn't remove
+  whatever was already fetched.
 - **John and Addy can't consent through Chris.** Publishing your own location
-  and medical history is your call to make; publishing theirs isn't, unless
-  they've each agreed to specifically this.
-- **It can't be taken back.** A page like this gets scraped and cached. Removing
-  it later doesn't remove the copies.
+  and medical history is your call; publishing theirs is theirs to agree to.
 
-If you want it gated later, the cheapest change is a token: have the car's
-bookmark carry `?k=<long-random-string>`, and put a few lines of PHP in front of
-`index.html` that 404s without it. Nothing about the dashboard itself changes,
-and the car still opens it in one tap with no typing.
+If you later want real protection without changing the dashboard or how the car
+opens it, put a few lines of PHP in front of `index.html` that require
+`?k=<long random string>` and 404 without it, and let the car's bookmark carry
+the key. Same one-tap experience, but the secret is then long enough to be worth
+something and can be rotated without moving the site.
