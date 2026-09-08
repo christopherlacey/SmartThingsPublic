@@ -24,6 +24,17 @@ CREATE TABLE IF NOT EXISTS account (
   password_set_at TEXT   NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Single-use codes for getting back in when the authenticator is gone. Only
+-- their hashes are stored; the plaintext exists once, at the moment they are
+-- generated. Without these, turning on a second factor is one lost phone away
+-- from being locked out of your own medical records.
+CREATE TABLE IF NOT EXISTS recovery_codes (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  code_hash  TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  used_at    TEXT
+);
+
 -- Login throttling. Rows are pruned on successful login and by age.
 CREATE TABLE IF NOT EXISTS login_attempts (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,

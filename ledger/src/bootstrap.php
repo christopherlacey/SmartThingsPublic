@@ -12,6 +12,7 @@ const LEDGER_ROOT = __DIR__ . '/..';
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/csrf.php';
+require_once __DIR__ . '/totp.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/format.php';
 require_once __DIR__ . '/models.php';

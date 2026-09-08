@@ -31,12 +31,15 @@ Two things follow that are worth doing regardless of what happens to this code:
    by anyone who knew the hostname, for as long as it was up, and it was
    `noindex` but not access-controlled. Names, cities and personal fields for 22
    people were in it.
-2. **Take the old pages down before pointing the domain at anything new.**
-   Deploying this alongside them fixes nothing while `index.php` still answers
-   anonymously.
+2. **The old pages stay exposed until this replaces them.** That is the chosen
+   plan, and it means the deploy is the fix — deploying this *alongside* the old
+   pages fixes nothing while `index.php` still answers anonymously. Overwrite
+   them, don't sit beside them, and import before you overwrite (see below —
+   the importer reads those same pages).
 
 `./deploy.sh --check` tests exactly this: it fails if any page returns 200 to an
-anonymous request.
+anonymous request. Run it right after the deploy; a pass is the moment the
+exposure actually closes.
 
 ---
 
@@ -73,6 +76,19 @@ cp config.php.example config.php && chmod 600 config.php
 $EDITOR config.php                 # db path, timezone, location token
 php bin/init-db.php                # create the database
 php bin/set-password.php chris     # prompts twice, echo off, 12 chars minimum
+php bin/setup-totp.php             # second factor + recovery codes
+```
+
+`setup-totp.php` prints a secret to paste into your authenticator, then makes
+you type a live code back before it saves anything — so a mistyped secret fails
+at enrolment rather than the next time you try to sign in. It finishes by
+printing ten single-use recovery codes. Write those down somewhere that is not
+the phone holding the authenticator; they are the only way back in if that phone
+is lost, and only their hashes are kept, so they cannot be shown again.
+
+```sh
+php bin/setup-totp.php --codes     # re-issue recovery codes
+php bin/setup-totp.php --off       # back to password only
 ```
 
 Then, to see it working before entering anything real:
@@ -147,6 +163,105 @@ decision taken on its own rather than a side effect of a redesign.
 
 ---
 
+## Bringing the old site across
+
+```sh
+php bin/import-legacy.php --from-site https://c.lacey.me --dry-run
+php bin/import-legacy.php --from-site https://c.lacey.me
+```
+
+The dry run reports counts and writes nothing. Against the live site as it
+stands, that is 23 people, 598 fields on them, and 160 change-log entries.
+
+Everything is read before a single row is written, and the writes run in one
+transaction — a half-imported ledger that looks complete is worse than no import
+at all. Re-running against a database that already has people in it is refused
+rather than silently duplicating them.
+
+`--from-site` also accepts a **local directory**, which is the easier order of
+operations if you would rather take the old site down first and import
+afterwards:
+
+```sh
+wget -E -k -p https://c.lacey.me/people.php https://c.lacey.me/index.php \
+     https://c.lacey.me/changelog.php 'https://c.lacey.me/person.php?id=1' ...
+php bin/import-legacy.php --from-site ./saved-copy
+```
+
+Two things it cannot recover, because the old pages never rendered them:
+per-field `source` values, and change-log timestamps (the log groups by day but
+the imported rows are stamped at import time). Confidence tags — confirmed,
+inferred, stale — are read from the overview page, which is the only page that
+shows them.
+
+**If you get a database dump instead**, that is a better source than the HTML.
+Run:
+
+```sh
+php bin/import-legacy.php --inspect 'sqlite:/path/to/old.sqlite'
+php bin/import-legacy.php --inspect 'mysql:host=localhost;dbname=old' --user u --pass p
+```
+
+It prints the legacy tables, their columns and row counts — structure only,
+never row contents — next to the fields this schema wants, so the mapping can be
+written against something real. That mapping is the one piece deliberately left
+blank: guessing at column names for medical and financial records is how an
+import quietly puts the wrong value in the wrong field.
+
+## Backups
+
+```sh
+php bin/backup.php --to /backups --age-recipient age1ql3z...
+php bin/backup.php --to /backups --recipient chris@chrislacey.com   # gpg
+```
+
+Two things this does that copying the file does not:
+
+- **`VACUUM INTO`**, so the copy is consistent even if a write lands mid-backup.
+  A shell `cp` of a live SQLite file can capture a torn page and give you a
+  backup that only fails on the day you need it.
+- **Encrypts to a public key**, so the backup is safe to put somewhere you don't
+  fully control — which is the point of having one. The private key never goes on
+  the server, so a compromised host cannot read its own backups.
+
+The recipient key is checked *before* the snapshot is taken, so a wrong key never
+leaves a plaintext copy on disk; if encryption fails anyway, the plaintext
+snapshot is deleted rather than left behind. `--keep N` prunes older backups
+(default 30) — old copies of medical records are a liability, not an asset.
+
+Nightly, via cron:
+
+```
+17 3 * * *  php /var/www/ledger/bin/backup.php --to /backups --age-recipient age1ql3z... >> /var/log/ledger-backup.log 2>&1
+```
+
+Restore is just a decrypt:
+
+```sh
+age -d -i ~/age.key -o ledger.sqlite /backups/ledger-2026-09-08-031701.sqlite.age
+```
+
+Verified end to end: encrypt, confirm the result is not readable as a database,
+decrypt, `PRAGMA integrity_check` clean, all rows present.
+
+## Encryption at rest
+
+The backups above are encrypted. The **live database is not** — it can't be, in
+a form the site can still read, sort and total. Handle that at the host layer:
+
+- **Full-disk encryption on the server** (LUKS on Linux). This is the piece that
+  covers a decommissioned disk, a seized machine, or a stolen laptop.
+- **`config.php` and the database file are `0600`**, owned by the web user; the
+  database sits outside the docroot and `deploy.sh --check` proves it isn't
+  fetchable.
+- **The backup destination should be a different machine or provider** than the
+  one running the site.
+
+Encrypting individual columns in the application was considered and rejected: an
+encrypted column can't be searched, sorted or summed, so the charts and lookups
+that make this dashboard useful would stop working — and the key would still be
+sitting on the same box as the data, which is most of the threat model unchanged.
+
 ## Security notes
 
 This holds medical and financial records for you and for other people, so:
@@ -172,14 +287,19 @@ This holds medical and financial records for you and for other people, so:
   nothing more — the value is still in the delivered HTML, so it is not a
   substitute for not storing something in the first place.
 
-Two things this deliberately does **not** do, which are worth deciding on
-separately:
+- **A second factor**, TOTP (RFC 6238), verified against the standard test
+  vectors so it works with any authenticator app. The password alone never
+  creates a session: it sets a pending state that expires in five minutes, and
+  the code step is throttled on the same counter. Ten single-use recovery codes
+  are stored as hashes.
 
-- **No second factor.** One password is the only thing in front of the whole
-  record. The `account` table has a `totp_secret` column reserved for it.
-- **The database is not encrypted at rest.** Anyone with the file, or with a
-  host backup, has everything. Full-disk encryption on the host and an encrypted
-  backup destination are the cheap version of fixing this.
+What remains, and is worth deciding on separately:
+
+- **The live database is not encrypted at rest** — see the section above for why
+  that is a host-layer job, and what to do about it.
+- **Recovery codes are only as good as where you put them.** They bypass the
+  second factor by design. Somewhere physical, not the phone, not the same
+  password manager.
 
 ---
 
