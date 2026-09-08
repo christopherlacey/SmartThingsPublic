@@ -239,6 +239,43 @@ in one transaction. A bad date or a missing name fails the whole import rather
 than loading the good half — a medication list that is silently missing two
 entries is more dangerous than one that refused to load.
 
+### When they are in a dozen different formats
+
+Which they will be — a PDF from one surgery, a scan from another, a photo of a
+letter, a spreadsheet of results. There is no parser that reads all of that, and
+writing one per provider is a losing game. So there are two answers, and they
+work together:
+
+**Keep the documents as documents.**
+
+```sh
+php bin/import-documents.php --dir /root/records --dry-run
+php bin/import-documents.php --dir /root/records
+```
+
+Walks the folder, files everything as-is without converting anything, and lists
+it on the Health tab. Titles and dates are guessed from filenames (it reads
+`2026-03-14`, `2025_11_02` and `20240712` alike), content is hashed so the same
+document added twice is recognised rather than duplicated, and the files are
+copied to `documents_dir` — outside the web root, mode 0600, under generated
+names. Nothing derived from the original filename is ever used to build a path.
+
+They are served only by `document.php`, which requires a session first. PDFs and
+images can open in the browser; everything else is forced to download, so a
+stored file can never be rendered as active content on this origin.
+
+**Then structure only the facts that need to be queryable.** Medications,
+allergies, refill dates — the things the dashboard warns you about. That is
+`import-health.php`, and it is a much smaller job than transcribing everything.
+
+**Or let HDA do the extraction.** `app.healthdataavatar.com` takes documents in a
+wide range of formats and languages, extracts medications and the rest, and an
+assistant can read the structured result through its connector. That is the
+route that turns a mixed pile into structured data without anyone transcribing
+it by hand. Note the dashboard cannot reach HDA itself — it is a connector
+available to an assistant, not to this web server — so the structured result
+still arrives here as a file for `import-health.php`.
+
 ### Where to put the records in the first place
 
 This matters more than the import command, so it is worth being blunt about it.

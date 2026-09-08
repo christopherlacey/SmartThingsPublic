@@ -95,6 +95,18 @@ function due_phrase(?string $day): string
     return abs($d) . ' days overdue';
 }
 
+/** "1.2 MB", "840 KB". */
+function filesize_h(int $bytes): string
+{
+    if ($bytes >= 1048576) {
+        return number_format($bytes / 1048576, 1) . ' MB';
+    }
+    if ($bytes >= 1024) {
+        return number_format($bytes / 1024, 0) . ' KB';
+    }
+    return $bytes . ' B';
+}
+
 /** Round-trip a value into a JSON block the page can read but never execute. */
 function json_block(string $id, mixed $data): string
 {

@@ -211,6 +211,37 @@ CREATE TABLE IF NOT EXISTS conditions (
   resolved_on TEXT
 );
 
+-- Source documents: the PDFs, scans, photos and printouts a medical record
+-- actually arrives as. Deliberately no attempt to parse them — a pile of
+-- records from different providers has no common format, and a parser per
+-- provider is a losing game. Get them in, indexed and retrievable, then
+-- structure the handful of facts that need to be queryable (medications,
+-- allergies) separately.
+--
+-- The files themselves live outside the web root, next to the database. Only
+-- their metadata is here; `stored_name` is what the file is called on disk, and
+-- nothing user-supplied is ever used to build a path.
+CREATE TABLE IF NOT EXISTS documents (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  person_id   INTEGER REFERENCES people (id) ON DELETE SET NULL,
+  title       TEXT NOT NULL,
+  doc_date    TEXT,                   -- YYYY-MM-DD when known
+  kind        TEXT NOT NULL DEFAULT 'record'
+    CHECK (kind IN ('record','lab','imaging','letter','prescription','insurance','note','other')),
+  original_name TEXT NOT NULL,
+  stored_name TEXT NOT NULL UNIQUE,   -- generated; never taken from input
+  mime        TEXT,
+  bytes       INTEGER NOT NULL DEFAULT 0,
+  -- Content hash, so the same document added twice is recognised rather than
+  -- silently duplicated.
+  sha256      TEXT NOT NULL,
+  provider    TEXT,
+  note        TEXT,
+  added_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_documents_person ON documents (person_id, doc_date DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_sha ON documents (sha256);
+
 -- ----------------------------------------------------------------- money --
 
 CREATE TABLE IF NOT EXISTS accounts (

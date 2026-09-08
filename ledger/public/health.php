@@ -28,6 +28,7 @@ $meds       = $subject ? active_medications($personId) : [];
 $refills    = $subject ? refills_due($personId, 30) : [];
 $metrics    = $subject ? tracked_metrics($personId) : [];
 $appts      = upcoming_appointments(10);
+$documents  = $subject ? person_documents($personId) : [];
 $conditions = $subject
     ? q('SELECT * FROM conditions WHERE person_id = ? AND resolved_on IS NULL ORDER BY kind, name', [$personId])
     : [];
@@ -86,7 +87,8 @@ page_header('health', 'Health', $subject ? h($subject['name']) : 'Nobody on file
     $mine = array_values(array_filter($appts, static fn(array $a): bool => (int) $a['person_id'] === $personId));
     stat_tile('Next appointment', $mine ? due_phrase($mine[0]['on_day']) : '—',
         $mine ? h($mine[0]['what']) : 'nothing scheduled');
-    stat_tile('Tracked', (string) count($metrics), count($metrics) ? 'metrics with readings' : 'nothing measured yet');
+    stat_tile('Documents', (string) count($documents),
+        $documents ? 'records on file' : 'none filed yet');
     ?>
   </div>
 </section>
@@ -205,6 +207,51 @@ page_header('health', 'Health', $subject ? h($subject['name']) : 'Nobody on file
         </tbody>
       </table>
     </div>
+  <?php endif; ?>
+</section>
+
+<?php /* ------------------------------------------------------ documents -- */ ?>
+<section>
+  <?php eyebrow('Documents'); ?>
+  <h2>Records on file</h2>
+
+  <?php if (!$documents): ?>
+    <div class="card">
+      <?php empty_line('No documents filed yet.'); ?>
+      <p class="line">Copy them onto the server and run
+        <span class="mono">bin/import-documents.php --dir &lt;folder&gt;</span>.
+        Any format — they are stored as they are, not converted.</p>
+    </div>
+  <?php else: ?>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Document</th><th>Date</th><th>Type</th><th class="num">Size</th><th></th></tr>
+        </thead>
+        <tbody>
+          <?php foreach ($documents as $d): ?>
+            <?php
+              $canInline = in_array($d['mime'], ['application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp'], true);
+            ?>
+            <tr>
+              <td><?= h($d['title']) ?>
+                  <?php if ($d['provider']): ?><span class="mono"> · <?= h($d['provider']) ?></span><?php endif; ?>
+              </td>
+              <td class="mono"><?= h($d['doc_date'] ?? '—') ?></td>
+              <td><?= h($d['kind']) ?></td>
+              <td class="num"><?= h(filesize_h((int) $d['bytes'])) ?></td>
+              <td class="row-actions">
+                <?php if ($canInline): ?>
+                  <a class="btn btn-ghost btn-small" href="document.php?id=<?= (int) $d['id'] ?>&amp;inline=1">View</a>
+                <?php endif; ?>
+                <a class="btn btn-ghost btn-small" href="document.php?id=<?= (int) $d['id'] ?>">Download</a>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <p class="hint spaced">Titles and dates are guessed from filenames. Anything wrong is worth correcting.</p>
   <?php endif; ?>
 </section>
 

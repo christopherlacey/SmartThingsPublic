@@ -200,6 +200,18 @@ function tracked_metrics(int $personId): array
     );
 }
 
+/** Source documents on file for someone, newest first. */
+function person_documents(int $personId, int $limit = 200): array
+{
+    return q(
+        'SELECT * FROM documents
+          WHERE person_id = ?
+          ORDER BY doc_date IS NULL, doc_date DESC, added_at DESC
+          LIMIT ?',
+        [$personId, $limit]
+    );
+}
+
 function upcoming_appointments(int $limit = 6): array
 {
     return q(

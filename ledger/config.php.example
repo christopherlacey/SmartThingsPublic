@@ -15,6 +15,12 @@ return [
     // verifies it is not fetchable over HTTP.
     'db' => '/var/lib/ledger/ledger.sqlite',
 
+    // Where uploaded medical documents are kept. Like the database, this MUST
+    // be outside the web root — the files are served only through
+    // document.php, which checks the session first. Defaults to a 'documents'
+    // directory alongside the database.
+    'documents_dir' => '/var/lib/ledger/documents',
+
     // Who the dashboard is for. Shown in the greeting and used to pick the
     // `people` row flagged is_self.
     'owner_name'  => 'Chris',
