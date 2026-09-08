@@ -46,7 +46,7 @@ exposure ends.
 |---|---|
 | `public/` | The docroot. The **only** directory that should be web-reachable. |
 | `src/` | Application code. Must sit above the docroot. |
-| `bin/` | Command-line setup: create the database, set the password, seed examples. |
+| `bin/` | Command-line setup: `first-run.sh` for a one-pass install, plus the database, password, second factor, imports and backups. |
 | `schema.sql` | The whole database. Re-runnable. |
 | `config.php.example` | Copy to `config.php`, fill in, never commit. |
 | `deploy.sh` | Deploy and verify, including the anonymous-access checks. |
@@ -67,6 +67,21 @@ exposure ends.
 ---
 
 ## Setting it up
+
+The fast path, on the server, after `deploy.sh` has copied the code:
+
+```sh
+cd /var/www/ledger && ./bin/first-run.sh
+```
+
+It fills in the schema, the account, the second factor and the legacy import in
+one pass, skips whatever is already done so it is safe to re-run, and refuses to
+continue if the database path points inside the web root. It deliberately does
+**not** touch the vhost — pointing the server at `ledger/public` is the step that
+actually takes the old pages out of service, and that should be a decision you
+make, not one a script makes for you.
+
+The same steps by hand:
 
 ```sh
 cp config.php.example config.php && chmod 600 config.php
@@ -204,6 +219,49 @@ never row contents — next to the fields this schema wants, so the mapping can 
 written against something real. That mapping is the one piece deliberately left
 blank: guessing at column names for medical and financial records is how an
 import quietly puts the wrong value in the wrong field.
+
+## Medical records
+
+```sh
+php bin/import-health.php --file /root/records.json --dry-run
+php bin/import-health.php --file /root/records.json
+php bin/import-health.php --vitals-csv /root/weights.csv --metric weight --unit lb
+```
+
+Reads a file **already on this server**. It makes no network calls, so the
+records never pass through anything else to get here. Medications, conditions
+and allergies, appointments and numeric readings; the JSON shape is documented
+at the top of the script, and HDA's own medication export is accepted as-is
+(`dosage` reads as `dose`).
+
+Everything is validated and counted before a single row is written, then written
+in one transaction. A bad date or a missing name fails the whole import rather
+than loading the good half — a medication list that is silently missing two
+entries is more dangerous than one that refused to load.
+
+### Where to put the records in the first place
+
+This matters more than the import command, so it is worth being blunt about it.
+
+**Do not** paste records into a chat window with an assistant — they end up in
+that conversation's transcript. **Do not** put them in this repository: it is a
+fork of a public project and is world-readable. **Do not** leave them in a
+cloud sandbox or scratch directory, which is wiped without warning.
+
+Two routes that are actually fine:
+
+- **HDA** (`app.healthdataavatar.com`) — drag documents in, it extracts
+  medications and the rest, and an assistant can read the structured result
+  through the connector without you handing over the files. It also has a guided
+  Subject Access Request flow for getting records out of a GP in the first place.
+- **Straight to this server** — `scp` the file to a directory outside the web
+  root, run the import above, then `shred -u` it. The script prints that command
+  when it finishes.
+
+The dashboard reads only its own database, which lives outside the docroot. It
+has no connection to HDA or to any health provider, and adding one would mean
+giving a web-facing PHP app standing credentials to a medical record system —
+worth deciding on deliberately rather than as a side effect.
 
 ## Backups
 
