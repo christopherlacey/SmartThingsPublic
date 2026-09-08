@@ -588,6 +588,20 @@
   /* ---------------------------------------------------------------- data -- */
 
   function load(first) {
+    // Preview builds (make-preview.py) embed their sample data and have no
+    // data.json to fetch. Production never defines this, so the fetch path
+    // below is unchanged on the real site.
+    if (window.__PREVIEW_DATA__) {
+      state.data = window.__PREVIEW_DATA__;
+      state.lastGood = Date.now();
+      state.failures = 0;
+      $('#setup').hidden = true;
+      if (first) initMap();
+      renderAll(first);
+      setSync('', 'Sample data');
+      return;
+    }
+
     // Cache-bust: the Tesla browser is aggressive about holding onto files, and
     // a dashboard showing yesterday's positions is worse than showing none.
     fetch(DATA_URL + '?t=' + Date.now(), { cache: 'no-store' })

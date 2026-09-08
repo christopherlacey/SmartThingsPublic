@@ -1,0 +1,345 @@
+{
+  "_sample": [
+    "FABRICATED TEST DATA. Every name, condition, medication, phone number",
+    "and coordinate below is invented for layout testing on the car screen.",
+    "These are not real medical records and must never be treated as any.",
+    "The real file is data.json, which is gitignored and never committed."
+  ],
+  "meta": {
+    "refreshSeconds": 120,
+    "staleMinutes": 20,
+    "generated": "2026-09-08T12:09:14+00:00"
+  },
+  "people": [
+    {
+      "id": "chris",
+      "name": "Chris",
+      "initials": "C",
+      "role": "",
+      "color": "#0EA5E9",
+      "location": {
+        "lat": 40.74128,
+        "lon": -73.98965,
+        "place": "Home",
+        "detail": "Arrived 8:15 AM",
+        "status": "stationary",
+        "speedMph": 0,
+        "updated": "2026-09-08T12:05:14+00:00"
+      },
+      "schedule": [
+        {
+          "start": "08:00",
+          "end": "08:30",
+          "title": "School run",
+          "where": "Riverside",
+          "kind": "personal"
+        },
+        {
+          "start": "09:30",
+          "end": "10:30",
+          "title": "Bar & Cocoa \u2014 supplier call",
+          "where": "Office",
+          "kind": "work"
+        },
+        {
+          "start": "12:00",
+          "end": "13:00",
+          "title": "Lunch with Dana",
+          "where": "Cafe Mode",
+          "kind": "personal"
+        },
+        {
+          "start": "15:30",
+          "end": "16:15",
+          "title": "Cardiology follow-up",
+          "where": "Mercy Medical, Suite 400",
+          "kind": "medical",
+          "note": "Bring last BP log"
+        },
+        {
+          "start": "18:30",
+          "end": "20:00",
+          "title": "NGNS community call",
+          "where": "Home",
+          "kind": "work"
+        }
+      ],
+      "medical": {
+        "alert": "",
+        "bloodType": "O+",
+        "organDonor": true,
+        "allergies": [
+          {
+            "what": "Penicillin",
+            "severity": "severe",
+            "reaction": "anaphylaxis"
+          },
+          {
+            "what": "Shellfish",
+            "severity": "mild",
+            "reaction": "hives"
+          }
+        ],
+        "conditions": [
+          {
+            "name": "Hypertension",
+            "since": "2019",
+            "notes": "Controlled; home BP log twice weekly"
+          }
+        ],
+        "medications": [
+          {
+            "name": "Lisinopril",
+            "dose": "10 mg",
+            "schedule": "Daily, morning"
+          },
+          {
+            "name": "Atorvastatin",
+            "dose": "20 mg",
+            "schedule": "Nightly",
+            "note": "Taken with food"
+          }
+        ],
+        "devices": [],
+        "appointments": [
+          {
+            "what": "Cardiology follow-up",
+            "when": "Today 3:30 PM",
+            "where": "Mercy Medical, Suite 400"
+          }
+        ],
+        "providers": [
+          {
+            "role": "Primary care",
+            "name": "Dr. A. Whitfield",
+            "phone": "+1 555 0142"
+          },
+          {
+            "role": "Cardiology",
+            "name": "Dr. M. Okafor",
+            "phone": "+1 555 0177"
+          }
+        ],
+        "pharmacy": {
+          "name": "Riverside Pharmacy",
+          "phone": "+1 555 0190",
+          "address": "212 Riverside Dr"
+        },
+        "emergency": [
+          {
+            "relation": "Partner",
+            "name": "Dana",
+            "phone": "+1 555 0101"
+          }
+        ],
+        "notes": [
+          "Carries an EpiPen in the car's centre console.",
+          "Prefers Mercy Medical over County General for anything non-emergency."
+        ]
+      }
+    },
+    {
+      "id": "john",
+      "name": "John",
+      "initials": "J",
+      "role": "",
+      "color": "#34D399",
+      "location": {
+        "lat": 40.75519,
+        "lon": -73.98416,
+        "place": "En route to Office",
+        "detail": "On I-95 N",
+        "status": "moving",
+        "speedMph": 34,
+        "updated": "2026-09-08T12:08:14+00:00"
+      },
+      "schedule": [
+        {
+          "start": "09:00",
+          "end": "17:00",
+          "title": "Workshop day",
+          "where": "Fulton St yard",
+          "kind": "work"
+        },
+        {
+          "start": "17:30",
+          "end": "18:30",
+          "title": "Physio",
+          "where": "Eastside Rehab",
+          "kind": "medical"
+        }
+      ],
+      "medical": {
+        "alert": "",
+        "bloodType": "A-",
+        "organDonor": false,
+        "allergies": [
+          {
+            "what": "Latex",
+            "severity": "moderate",
+            "reaction": "contact dermatitis"
+          }
+        ],
+        "conditions": [
+          {
+            "name": "Type 2 diabetes",
+            "since": "2015",
+            "notes": "Diet-controlled plus metformin"
+          },
+          {
+            "name": "Lower back injury",
+            "since": "2024",
+            "notes": "Physio ongoing"
+          }
+        ],
+        "medications": [
+          {
+            "name": "Metformin",
+            "dose": "500 mg",
+            "schedule": "Twice daily"
+          }
+        ],
+        "devices": [
+          "Continuous glucose monitor (left arm)"
+        ],
+        "appointments": [
+          {
+            "what": "Physio",
+            "when": "Today 5:30 PM",
+            "where": "Eastside Rehab"
+          }
+        ],
+        "providers": [
+          {
+            "role": "Primary care",
+            "name": "Dr. S. Reyes",
+            "phone": "+1 555 0155"
+          }
+        ],
+        "pharmacy": {
+          "name": "Fulton Chemist",
+          "phone": "+1 555 0163",
+          "address": "88 Fulton St"
+        },
+        "emergency": [
+          {
+            "relation": "Brother",
+            "name": "Chris",
+            "phone": "+1 555 0100"
+          }
+        ],
+        "notes": [
+          "CGM alarms on his phone, not here \u2014 treat a low reading as urgent."
+        ]
+      }
+    },
+    {
+      "id": "addy",
+      "name": "Addy",
+      "initials": "A",
+      "role": "",
+      "color": "#F472B6",
+      "location": {
+        "lat": 40.7289,
+        "lon": -74.00195,
+        "place": "School",
+        "detail": "Since 8:05 AM",
+        "status": "stationary",
+        "speedMph": 0,
+        "updated": "2026-09-08T11:43:14+00:00"
+      },
+      "schedule": [
+        {
+          "start": "08:15",
+          "end": "14:45",
+          "title": "School",
+          "where": "Hillcrest Academy",
+          "kind": "school"
+        },
+        {
+          "start": "15:15",
+          "end": "16:30",
+          "title": "Orchestra rehearsal",
+          "where": "Hillcrest music room",
+          "kind": "school"
+        },
+        {
+          "start": "17:30",
+          "end": "18:30",
+          "title": "Swim practice",
+          "where": "Aquatic Centre",
+          "kind": "personal",
+          "note": "Needs kit in the boot"
+        }
+      ],
+      "medical": {
+        "alert": "",
+        "bloodType": "O+",
+        "organDonor": null,
+        "allergies": [
+          {
+            "what": "Peanuts",
+            "severity": "anaphylaxis",
+            "reaction": "airway swelling"
+          }
+        ],
+        "conditions": [
+          {
+            "name": "Asthma",
+            "since": "2018",
+            "notes": "Exercise-induced; inhaler before swim"
+          }
+        ],
+        "medications": [
+          {
+            "name": "Albuterol inhaler",
+            "dose": "2 puffs",
+            "schedule": "As needed / pre-exercise"
+          },
+          {
+            "name": "EpiPen Jr",
+            "dose": "0.15 mg",
+            "schedule": "Emergency only",
+            "note": "One in her bag, one in the car"
+          }
+        ],
+        "devices": [],
+        "appointments": [
+          {
+            "what": "Allergy review",
+            "when": "Fri 19 Sep, 10:00 AM",
+            "where": "Mercy Paediatrics"
+          }
+        ],
+        "providers": [
+          {
+            "role": "Pediatrician",
+            "name": "Dr. L. Hahn",
+            "phone": "+1 555 0188"
+          },
+          {
+            "role": "School nurse",
+            "name": "Hillcrest Academy",
+            "phone": "+1 555 0199"
+          }
+        ],
+        "pharmacy": {
+          "name": "Riverside Pharmacy",
+          "phone": "+1 555 0190",
+          "address": "212 Riverside Dr"
+        },
+        "emergency": [
+          {
+            "relation": "Father",
+            "name": "Chris",
+            "phone": "+1 555 0100"
+          }
+        ],
+        "notes": [
+          "Peanut exposure: EpiPen first, then 911 \u2014 do not wait to see if it settles.",
+          "School has a copy of the action plan on file."
+        ]
+      }
+    }
+  ]
+}
