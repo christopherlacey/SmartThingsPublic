@@ -1,0 +1,50 @@
+<?php
+/**
+ * The Lacey Ledger — configuration.
+ *
+ * Copy to config.php, fill in, and keep it out of the web root and out of git.
+ *   cp config.php.example config.php && chmod 600 config.php
+ *
+ * Nothing here has a working default on purpose. A ledger holding medical and
+ * financial records should refuse to start rather than come up unprotected.
+ */
+
+return [
+    // Absolute path to the SQLite file. MUST NOT be inside the web root — it
+    // holds medical and financial records in plain text. deploy.sh --check
+    // verifies it is not fetchable over HTTP.
+    'db' => '/var/lib/ledger/ledger.sqlite',
+
+    // Who the dashboard is for. Shown in the greeting and used to pick the
+    // `people` row flagged is_self.
+    'owner_name'  => 'Chris',
+    'owner_email' => 'chris@chrislacey.com',
+
+    // Portrait shown in the header and footer, matching chrislacey.com.
+    // Drop the same file into public/assets/ or point this at the live URL.
+    'portrait' => 'assets/chris-lacey-headshot-2026.png',
+
+    // Links in the footer, identical to every other Chris Lacey property.
+    'emergency_url' => 'https://emergency.chrislacey.com',
+    'privacy_url'   => 'https://privacy.chrislacey.com',
+
+    // Local timezone. Everything stored is UTC; everything displayed is this.
+    'timezone' => 'America/New_York',
+
+    // Bearer token for POST /api/location.php. Generate a fresh one:
+    //   php -r 'echo bin2hex(random_bytes(32)), "\n";'
+    // Empty disables the endpoint entirely rather than leaving it open.
+    'location_token' => '',
+
+    // Sign out after this many seconds of inactivity.
+    'idle_timeout' => 1800,
+
+    // Login throttle: this many failures from one IP within the window locks
+    // that IP out for the rest of the window.
+    'max_login_attempts' => 8,
+    'login_window'       => 900,
+
+    // Set false only when developing over plain HTTP on localhost. In
+    // production this keeps the session cookie from ever crossing HTTP.
+    'require_https' => true,
+];
