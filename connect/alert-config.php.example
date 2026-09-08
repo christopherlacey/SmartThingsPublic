@@ -1,0 +1,59 @@
+<?php
+/**
+ * alert-config.php — where 911 alerts go. NEVER commit the filled-in version.
+ *
+ * Copy to alert-config.php and fill in. Every destination below must be a
+ * personal endpoint: Chris's phone and Chris's computer. Do not put a shared
+ * inbox, a team address, a group chat, a Slack channel or anyone else's number
+ * in this file — the whole point is that a 911 press reaches Chris and no one
+ * else. Leave a block out entirely to disable that channel.
+ *
+ * Anything left unconfigured is skipped silently; the on-disk log in alert_log
+ * is written regardless, so a press is never lost even with zero channels set.
+ */
+
+declare(strict_types=1);
+
+return [
+
+    // Where the permanent record goes. Put it OUTSIDE the web root — it holds
+    // IP addresses and, when allowed, GPS coordinates of people in trouble.
+    'alert_log'  => '/var/log/chrislacey/911-alerts.log',
+
+    // The site's own access log, read to find this visitor's other hits.
+    // Set to null to skip that lookup.
+    'access_log' => '/var/log/nginx/access.log',
+
+    // ---- Chris's phone --------------------------------------------------------
+    // SMS + WhatsApp + a ringing voice call, all via Twilio.
+    'twilio' => [
+        'sid'           => 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+        'token'         => 'REPLACE',
+        'sms_from'      => '+15550000000',            // your Twilio number
+        'sms_to'        => '+15551234567',            // YOUR cell, nobody else's
+        'whatsapp_from' => 'whatsapp:+14155238886',   // Twilio WhatsApp sender
+        'whatsapp_to'   => 'whatsapp:+15551234567',   // YOUR WhatsApp
+        'call_to'       => '+15551234567',            // YOUR cell — this one rings
+    ],
+
+    // ---- Chris's phone AND computer ------------------------------------------
+    // Pushover delivers to every device signed in to the one user key, so the
+    // phone and the desktop app both fire. Priority 2 repeats until acknowledged.
+    // Use your personal user key — never a group key.
+    'pushover' => [
+        'token' => 'REPLACE_APP_TOKEN',
+        'user'  => 'REPLACE_YOUR_USER_KEY',
+    ],
+
+    // Backup push path. Pick an unguessable topic name — anyone who knows a
+    // public ntfy topic can read it.
+    'ntfy' => [
+        'topic_url' => 'https://ntfy.sh/REPLACE-with-a-long-random-topic',
+    ],
+
+    // ---- Chris's computer -----------------------------------------------------
+    // Gets the full dossier, not just the summary.
+    'email_to'   => 'chris@chrislacey.com',
+    'email_from' => 'alerts@chrislacey.com',
+
+];

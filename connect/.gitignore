@@ -1,0 +1,4 @@
+# Real config holds phone numbers, handles and alert credentials. Never commit.
+contacts.php
+alert-config.php
+911-alerts.log
