@@ -3,7 +3,10 @@
 # deploy.sh — push the Model X dashboard to the Apache host.
 #
 #   ./deploy.sh --check     verify the live site only, change nothing
-#   ./deploy.sh             deploy, then verify
+#   ./deploy.sh --local     install from this checkout into DASH_DIR on THIS
+#                           machine -- use when running on the web server itself,
+#                           which needs no ssh, no scp and no keys
+#   ./deploy.sh             copy from here to SSH_HOST over ssh, then verify
 #
 # Configure once (or export these in your shell):
 #   SSH_HOST   user@host for the web server, e.g. myfsdev@lacey.me
@@ -125,8 +128,51 @@ verify() {
   if [ "$fail" -eq 0 ]; then green "All checks passed."; else red "Checks failed."; return 1; fi
 }
 
+
+# Install from this checkout into DASH_DIR on the machine we are already on.
+# This is the path to use when you have sshed into the web server: cloning the
+# repo there and running this avoids needing a workstation with both a checkout
+# and ssh keys.
+install_local() {
+  info "Installing into $DASH_DIR (local)"
+
+  if ! mkdir -p "$DASH_DIR/vendor/leaflet/images" 2>/dev/null; then
+    red "Cannot create $DASH_DIR — check the path and that you own it."
+    red "If it belongs to the web user, re-run under that account."
+    exit 4
+  fi
+
+  install -m 644 "$SRC/index.html" "$SRC/app.css" "$SRC/app.js" \
+                 "$SRC/data.example.json" "$SRC/.htaccess" "$DASH_DIR/"
+  install -m 644 "$SRC/vendor/leaflet/leaflet.js" "$SRC/vendor/leaflet/leaflet.css" \
+                 "$SRC/vendor/leaflet/LICENSE" "$DASH_DIR/vendor/leaflet/"
+  install -m 644 "$SRC"/vendor/leaflet/images/*.png "$DASH_DIR/vendor/leaflet/images/"
+
+  green "Files installed."
+
+  # Same rule as the remote path: never clobber real data, and never go live
+  # showing placeholders.
+  if [ -f "$DASH_DIR/data.json" ]; then
+    green "data.json already present — left untouched."
+  else
+    install -m 640 "$SRC/data.example.json" "$DASH_DIR/data.json"
+    warn "data.json did not exist. The example has been copied into place."
+    warn "Fill it in before the car sees this:"
+    warn "  \$EDITOR $DASH_DIR/data.json"
+    warn "Then re-run: ./deploy.sh --check"
+    exit 0
+  fi
+}
+
 if [ "${1:-}" = "--check" ]; then
   verify; exit $?
+fi
+
+if [ "${1:-}" = "--local" ]; then
+  guard_domain
+  install_local
+  verify
+  exit $?
 fi
 
 if [ -z "$SSH_HOST" ]; then

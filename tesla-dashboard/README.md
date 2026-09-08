@@ -106,13 +106,27 @@ the car never fetches a half-written JSON.
 
 ## Deploy
 
-```sh
-# check what's live without changing anything
-./deploy.sh --check
+Two ways, depending on where you run it.
 
-# deploy
+**On the web server** (simplest — no ssh keys, no local checkout):
+
+```sh
+ssh myfsdev@lacey.me
+git clone -b claude/life-dashboard-tesla-6uz3mj \
+  https://github.com/christopherlacey/SmartThingsPublic.git
+cd SmartThingsPublic/tesla-dashboard
+./deploy.sh --local          # seeds data.json, then stops
+$EDITOR /var/www/grok.lacey.me/'TmX$23!'/data.json
+./deploy.sh --check
+```
+
+**From a workstation** that has a checkout and can ssh to the host:
+
+```sh
 SSH_HOST=myfsdev@lacey.me ./deploy.sh
 ```
+
+Either way, `./deploy.sh --check` verifies the live site and changes nothing.
 
 The docroot and URL default to `grok.lacey.me` and the unlisted path; override
 `BASE_URL` to move it, and the docroot follows automatically.
