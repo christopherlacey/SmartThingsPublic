@@ -1,0 +1,45 @@
+<?php
+/**
+ * .contact-config.php — lives ABOVE the web root at ~/.contact-config.php
+ *
+ * Never inside a site directory, never in git. go.php reads it; nothing serves it.
+ *
+ * Leave a value as an empty string until you have the real one. An empty entry
+ * makes that button return 503 "That contact method is not set up yet." — which
+ * is the point: on an emergency page a visible failure is far better than a
+ * button that quietly dials the wrong number or opens WhatsApp's homepage.
+ *
+ * Phone numbers in E.164: +15551234567 — no spaces, dashes or brackets.
+ */
+
+declare(strict_types=1);
+
+return [
+
+    // ---- Chris ----------------------------------------------------------
+    'chris_phone_e164'     => '',   // cell: used by call, sms
+    'chris_whatsapp_e164'  => '',   // usually the same number
+    'chris_email'          => '',
+    'chris_schedule_url'   => 'https://book.chrislacey.com',
+    'chris_facetime'       => '',   // Apple ID email or phone
+    'chris_imessage'       => '',   // usually the cell number
+    'chris_signal_url'     => '',   // https://signal.me/#p/+15551234567
+    'chris_telegram_url'   => '',   // https://t.me/yourhandle
+    'chris_google_chat_url'=> '',   // Chat space or DM link — the kid-safe one
+
+    // ---- Student or Friend of Addy ---------------------------------------
+    // Keep these off the personal cell on purpose.
+    'addy_student_email'   => '',
+    'addy_friend_email'    => '',
+
+    // ---- Everything else --------------------------------------------------
+    'brasil_url'           => '',
+    'ngns_discord_url'     => 'https://discord.gg/ngns',
+    'barandcocoa_url'      => 'https://barandcocoa.com',
+    'website_url'          => 'https://chrislacey.com',
+    'linkedin_url'         => '',
+
+    // ---- John (pre-existing) ----------------------------------------------
+    'john_phone_e164'      => '',
+
+];
