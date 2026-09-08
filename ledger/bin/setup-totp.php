@@ -102,7 +102,10 @@ if (!totp_verify($secret, $code)) {
        . "Check your phone's clock is set automatically, then run this again.\n");
 }
 
-qx('UPDATE account SET totp_secret = ? WHERE id = 1', [$secret]);
+// Record the step the enrolment code came from, so that same code cannot be
+// turned straight around into the first sign-in.
+qx('UPDATE account SET totp_secret = ?, totp_last_counter = ? WHERE id = 1',
+    [$secret, (int) floor(time() / TOTP_PERIOD)]);
 log_change('account', 1, 'totp_secret', null, 'set', 'update', null, 'cli');
 
 echo "\nVerified. The second factor is on.\n";

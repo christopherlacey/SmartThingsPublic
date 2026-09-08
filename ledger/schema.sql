@@ -19,7 +19,10 @@ CREATE TABLE IF NOT EXISTS account (
   id             INTEGER PRIMARY KEY CHECK (id = 1),
   username       TEXT    NOT NULL,
   password_hash  TEXT    NOT NULL,
-  totp_secret    TEXT,                 -- reserved; not yet enforced
+  totp_secret    TEXT,
+  -- The time step of the last accepted code. A code is single-use: without
+  -- this, one captured code stays valid for the whole drift window.
+  totp_last_counter INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
   password_set_at TEXT   NOT NULL DEFAULT (datetime('now'))
 );

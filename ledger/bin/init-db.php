@@ -23,6 +23,31 @@ $path = $config['db'];
 $fresh = !file_exists($path);
 
 db()->exec(file_get_contents(__DIR__ . '/../schema.sql'));
+
+/**
+ * Columns added to existing tables after a database already exists.
+ *
+ * CREATE TABLE IF NOT EXISTS in schema.sql adds whole tables but never a column
+ * to a table that is already there, so each of these has to be applied by hand.
+ * Adding a column SQLite already has is an error, not a no-op, hence the check.
+ */
+$migrations = [
+    'account' => [
+        'totp_last_counter' => 'INTEGER NOT NULL DEFAULT 0',
+    ],
+];
+
+foreach ($migrations as $table => $columns) {
+    $existing = array_column(q("PRAGMA table_info($table)"), 'name');
+
+    foreach ($columns as $column => $definition) {
+        if (!in_array($column, $existing, true)) {
+            db()->exec("ALTER TABLE $table ADD COLUMN $column $definition");
+            echo "added $table.$column\n";
+        }
+    }
+}
+
 @chmod($path, 0600);
 
 echo ($fresh ? "Created" : "Updated"), " $path\n";

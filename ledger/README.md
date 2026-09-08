@@ -262,6 +262,37 @@ encrypted column can't be searched, sorted or summed, so the charts and lookups
 that make this dashboard useful would stop working — and the key would still be
 sitting on the same box as the data, which is most of the threat model unchanged.
 
+## What a review of this code found
+
+The application was reviewed adversarially after it was written. Two real
+problems came out of it, both now fixed, both worth knowing about because they
+are the kind of thing that comes back:
+
+- **`safe_next()` was an open redirect.** It rejected a `scheme:` prefix and a
+  literal `//`, but browsers treat a backslash as a slash when parsing http(s)
+  URLs, so `?next=/\evil.example` passed every check and redirected off-site
+  right after a successful sign-in — from the real domain, with the real
+  certificate, which is a good place to be asked for a password again. It is now
+  an allow-list of this app's own page names. Blocklisting URL prefixes does not
+  work; there is always another spelling.
+
+- **The Health tab's person picker did nothing at all.** It used an inline
+  `onchange`, which this app's own Content-Security-Policy forbids, and the
+  fallback button was inside `<noscript>` so it never rendered either. Fixed
+  with a real event listener in `ledger.js` and a button that is always in the
+  markup and only hidden once the script runs.
+
+The same review traced and cleared: SQL injection (every statement is bound,
+`EMULATE_PREPARES` off), XSS including the stored data written by the location
+API and the imported legacy records, the two-step sign-in for a bypass,
+CSRF coverage, the `location.php` token check, `exec()` use in `backup.php`, and
+XXE in the importer's HTML parsing.
+
+Worth being straight about the limits: the same author wrote and reviewed this.
+That is better than no review, and it is not the same as someone independent
+reading it. If this ends up holding what it is designed to hold, it is worth an
+outside pair of eyes.
+
 ## Security notes
 
 This holds medical and financial records for you and for other people, so:
@@ -273,11 +304,20 @@ This holds medical and financial records for you and for other people, so:
 - **Failed logins are throttled per IP**, counted from the direct peer rather
   than `X-Forwarded-For`, which a caller can set freely.
 - **Sessions** are HttpOnly, `SameSite=Lax`, Secure by default, regenerated on
-  sign-in, and dropped after 30 minutes idle.
+  sign-in, and dropped after 30 minutes idle. `Strict-Transport-Security` is
+  sent so the first request of a visit can't be answered over plain HTTP.
+- **Each TOTP code is single-use.** The time step of the last accepted code is
+  recorded and anything at or below it is refused, so a code read over your
+  shoulder — or typed into a convincing copy of this sign-in page — is dead
+  the moment it is used once.
+- **The post-sign-in redirect is an allow-list**, not a filter: `?next=` has to
+  name one of this app's own pages or it goes to the dashboard.
 - **The database lives outside the web root**, and `deploy.sh --check` verifies
   it is not fetchable.
 - **A strict Content-Security-Policy** with no inline script or style, no
-  third-party script origin, and `frame-ancestors 'none'`.
+  third-party script origin, and `frame-ancestors 'none'`. It is enforced, not
+  decorative — it caught an inline handler in this codebase that was silently
+  doing nothing, so treat a CSP console error as a real bug, not noise.
 - **`Cache-Control: no-store`** on every page, so records don't sit in a cache
   after sign-out.
 - **The location token is separate from the password** so it can be rotated on

@@ -187,7 +187,7 @@ function attempt_totp(string $entered): ?string
     $accountId = (int) $_SESSION['pending_uid'];
     $secret    = (string) qv('SELECT totp_secret FROM account WHERE id = ?', [$accountId]);
 
-    if (totp_verify($secret, $entered)) {
+    if (totp_verify_once($secret, $entered, $accountId)) {
         complete_login($accountId);
         return null;
     }
@@ -223,19 +223,48 @@ function logout(): void
 /**
  * Where to send someone after login.
  *
- * Only a local, relative path is honoured. Without this check `?next=` would be
- * an open redirect that bounces a signed-in session to someone else's site.
+ * An allow-list of the pages this app actually has, not a filter that tries to
+ * spot bad input. Blocklisting prefixes is how the earlier version of this got
+ * it wrong: it rejected "//host" and a "scheme:" prefix, but browsers treat a
+ * backslash as a slash when parsing http(s) URLs, so "/\\evil.example" slipped
+ * through all three checks and redirected off-site.
+ *
+ * That matters more than a stray redirect. A link to the real c.lacey.me, with
+ * the real certificate and the real sign-in form, that lands on someone else's
+ * host immediately after a successful sign-in is a convincing place to ask for
+ * the password again.
  */
 function safe_next(?string $next): string
 {
+    $fallback = 'index.php';
+
     if ($next === null || $next === '') {
-        return 'index.php';
+        return $fallback;
     }
-    if (str_starts_with($next, '//') || preg_match('#^[a-z][a-z0-9+.-]*:#i', $next)) {
-        return 'index.php';
+
+    // Control characters and backslashes have no business in a local path, and
+    // both are used to confuse URL parsers. Refuse rather than sanitise.
+    if (str_contains($next, '\\') || preg_match('/[\x00-\x1F\x7F]/', $next)) {
+        return $fallback;
     }
-    if (!str_starts_with($next, '/')) {
-        return 'index.php';
+
+    $parts = parse_url($next);
+
+    if ($parts === false || isset($parts['scheme'], $parts['host'])
+        || isset($parts['scheme']) || isset($parts['host'])) {
+        return $fallback;
     }
-    return $next;
+
+    // Only the pages that exist. Everything here lives in one directory, so the
+    // result is a bare filename and there is no path left to be clever with.
+    $page = basename($parts['path'] ?? '');
+
+    $allowed = ['index.php', 'health.php', 'money.php', 'errands.php',
+                'people.php', 'person.php', 'changelog.php'];
+
+    if (!in_array($page, $allowed, true)) {
+        return $fallback;
+    }
+
+    return $page . (isset($parts['query']) ? '?' . $parts['query'] : '');
 }

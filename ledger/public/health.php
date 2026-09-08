@@ -47,10 +47,14 @@ page_header('health', 'Health', $subject ? h($subject['name']) : 'Nobody on file
 
 <?php if (count($people) > 1): ?>
 <section>
-  <form method="get" action="health.php" class="stack">
+  <!-- data-autosubmit is wired up in ledger.js. It is not an inline onchange
+       handler because the Content-Security-Policy forbids those, and one here
+       silently broke this selector: the change did nothing and the fallback
+       button was inside <noscript>, so it never rendered either. -->
+  <form method="get" action="health.php" class="stack" data-autosubmit>
     <div class="field">
       <label for="person">Whose records</label>
-      <select id="person" name="person" onchange="this.form.submit()">
+      <select id="person" name="person">
         <?php foreach ($people as $p): ?>
           <option value="<?= (int) $p['id'] ?>"<?= (int) $p['id'] === $personId ? ' selected' : '' ?>>
             <?= h($p['name']) ?><?= $p['is_self'] ? ' (you)' : '' ?>
@@ -58,7 +62,7 @@ page_header('health', 'Health', $subject ? h($subject['name']) : 'Nobody on file
         <?php endforeach; ?>
       </select>
     </div>
-    <noscript><button type="submit" class="btn btn-ghost btn-small">Show</button></noscript>
+    <button type="submit" class="btn btn-ghost btn-small" data-autosubmit-hide>Show</button>
   </form>
 </section>
 <?php endif; ?>

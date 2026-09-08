@@ -131,9 +131,31 @@
     });
   }
 
+  /* --------------------------------------------------------- auto-submit -- */
+
+  /* A <select> that reloads the page on change. This lives here rather than in
+   * an onchange attribute because the CSP has no 'unsafe-inline', so an inline
+   * handler is silently refused — which is exactly how the Health tab's person
+   * picker ended up doing nothing at all.
+   *
+   * The submit button stays in the markup and is only hidden once this runs, so
+   * with scripting off the form is still usable. */
+  function setupAutoSubmit() {
+    document.querySelectorAll("form[data-autosubmit]").forEach(function (form) {
+      form.querySelectorAll("select").forEach(function (select) {
+        select.addEventListener("change", function () { form.submit(); });
+      });
+
+      form.querySelectorAll("[data-autosubmit-hide]").forEach(function (el) {
+        el.hidden = true;
+      });
+    });
+  }
+
   /* ---------------------------------------------------------------- init -- */
 
   document.querySelectorAll('input[type="password"][data-reveal]').forEach(setupReveal);
   document.querySelectorAll("[data-sensitive]").forEach(setupSensitive);
   setupShopping();
+  setupAutoSubmit();
 })();

@@ -112,6 +112,45 @@ function totp_verify(string $base32Secret, string $code): bool
     return false;
 }
 
+/**
+ * Verify a code and burn it.
+ *
+ * totp_verify() alone accepts any code inside the drift window, which means a
+ * code read over someone's shoulder — or typed into a convincing copy of this
+ * sign-in page — stays good for another minute and a half. Recording the time
+ * step each accepted code came from, and refusing anything at or below it,
+ * makes every code single-use.
+ *
+ * The window is still walked oldest-first so a code typed slowly, at the step
+ * before the current one, is accepted the once.
+ */
+function totp_verify_once(string $base32Secret, string $code, int $accountId): bool
+{
+    $code = preg_replace('/\D/', '', $code) ?? '';
+    if (strlen($code) !== TOTP_DIGITS) {
+        return false;
+    }
+
+    $now  = (int) floor(time() / TOTP_PERIOD);
+    $last = (int) qv('SELECT totp_last_counter FROM account WHERE id = ?', [$accountId]);
+
+    for ($drift = -TOTP_WINDOW; $drift <= TOTP_WINDOW; $drift++) {
+        $counter = $now + $drift;
+
+        // Already spent, or older than one that was.
+        if ($counter <= $last) {
+            continue;
+        }
+
+        if (hash_equals(totp_code($base32Secret, $counter), $code)) {
+            qx('UPDATE account SET totp_last_counter = ? WHERE id = ?', [$counter, $accountId]);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /** The otpauth:// URI an authenticator app enrols from. */
 function totp_uri(string $base32Secret, string $account, string $issuer): string
 {
