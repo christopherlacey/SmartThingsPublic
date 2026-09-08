@@ -81,6 +81,55 @@ verify() {
 
 if [ "${1:-}" = "--check" ]; then verify; exit $?; fi
 
+# --- Local mode: the web server IS this machine (DreamHost shared hosting, where
+#     sites live at ~/example.com rather than under /var/www). No SSH involved.
+if [ "${1:-}" = "--local" ]; then
+  CONNECT_LOCAL="${CONNECT_LOCAL:-$HOME/connect.chrislacey.com}"
+  EMERG_LOCAL="${EMERG_LOCAL:-$HOME/emergency.chrislacey.com}"
+  CONFIG="${CONFIG:-$HOME/.contact-config.php}"
+  STAMP=$(date +%Y%m%d-%H%M%S)
+
+  for d in "$CONNECT_LOCAL" "$EMERG_LOCAL"; do
+    [ -d "$d" ] || { red "No such directory: $d"; exit 2; }
+  done
+
+  # Back up anything we are about to replace. These are live files.
+  mkdir -p "$HOME/.connect-backups/$STAMP"
+  for f in "$CONNECT_LOCAL/Index.html" "$CONNECT_LOCAL/index.html" "$EMERG_LOCAL/go.php" "$EMERG_LOCAL/alert.php"; do
+    [ -f "$f" ] && cp -p "$f" "$HOME/.connect-backups/$STAMP/$(basename "$(dirname "$f")")--$(basename "$f")"
+  done
+  green "  backed up existing files to ~/.connect-backups/$STAMP"
+
+  # The page. Keep whichever index casing the site already uses, so we replace
+  # the served file instead of adding a second one Apache might pick between.
+  if [ -f "$CONNECT_LOCAL/Index.html" ]; then
+    cp "$SRC/index.html" "$CONNECT_LOCAL/Index.html"; green "  page  -> $CONNECT_LOCAL/Index.html"
+  else
+    cp "$SRC/index.html" "$CONNECT_LOCAL/index.html"; green "  page  -> $CONNECT_LOCAL/index.html"
+  fi
+
+  cp "$SRC/go.php"    "$EMERG_LOCAL/go.php";    green "  go.php -> $EMERG_LOCAL"
+  cp "$SRC/alert.php" "$EMERG_LOCAL/alert.php"; green "  alert.php -> $EMERG_LOCAL"
+
+  # Config lives above the web root and is never overwritten once it exists.
+  if [ ! -f "$CONFIG" ]; then
+    cp "$SRC/contact-config.php.example" "$CONFIG"
+    chmod 600 "$CONFIG"
+    echo
+    red "Created $CONFIG with every value blank."
+    red "Until you fill it in, each button returns 503 'not set up yet' — deliberately,"
+    red "so nothing dials a wrong number in the meantime. Edit it now:"
+    echo "    nano $CONFIG"
+    echo "  then re-run: $0 --check"
+    exit 1
+  fi
+  chmod 600 "$CONFIG"
+  green "  config already present at $CONFIG (left untouched)"
+  echo
+  verify
+  exit $?
+fi
+
 [ -n "$SSH_HOST" ] || { red "Set SSH_HOST first, e.g. SSH_HOST=chris@web01 ./deploy.sh"; exit 2; }
 
 info "Deploying to $SSH_HOST"

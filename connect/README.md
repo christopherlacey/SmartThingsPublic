@@ -8,14 +8,14 @@ The "every way to reach Chris" page, plus the two server-side pieces it depends 
 |---|---|
 | `index.html` | The page itself. Deploy to `connect.chrislacey.com`. |
 | `go.php` | Link redirector. Deploy to `emergency.chrislacey.com/go.php`. |
-| `contacts.php.example` | Channel code → real destination. Copy to `contacts.php`, fill in, **never commit**. |
+| `contact-config.php.example` | Channel code → real destination. Copy to `.contact-config.php`, fill in, **never commit**. |
 | `alert.php` | Fires when someone taps a 911 button. Deploy to `emergency.chrislacey.com/alert.php`. |
 | `alert-config.php.example` | Where 911 alerts go. Copy to `alert-config.php`, fill in, **never commit**. |
 
 ## Fix this first
 
 Every button on the live site is currently broken. `go.php?c=call` returns HTTP 500
-with `Contact configuration missing.` — `contacts.php` is missing or unreadable on
+with `Contact configuration missing.` — `.contact-config.php` is missing or unreadable on
 the server. Until it exists, nothing on the page works except 911.
 
 `tel:911` is hardcoded in the page and deliberately does **not** route through
@@ -23,7 +23,7 @@ the server. Until it exists, nothing on the page works except 911.
 
 ## Channel codes
 
-All 19 buttons route through `go.php?c=<code>`. Each needs an entry in `contacts.php`.
+All 19 buttons route through `go.php?c=<code>`. Each needs an entry in `.contact-config.php`.
 
 **Chris** (page order is fastest → slowest, WhatsApp call first, phone call last):
 `whatsapp-call`, `whatsapp-message`, `facetime`, `imessage`, `signal`, `telegram`,
@@ -89,11 +89,11 @@ EMERGENCY_DIR=/var/www/emergency \
 ```
 
 On a first run the config files won't exist. The script copies the templates into
-place, then **stops** rather than going live — a blank `contacts.php` would leave
+place, then **stops** rather than going live — a blank `.contact-config.php` would leave
 every button 404ing. Fill them in and re-run:
 
 ```sh
-ssh chris@your-web-host $EDITOR /var/www/emergency/contacts.php
+ssh chris@your-web-host $EDITOR /var/www/emergency/.contact-config.php
 ssh chris@your-web-host $EDITOR /var/www/emergency/alert-config.php
 ./deploy.sh --check
 ```
@@ -107,7 +107,7 @@ Existing config is never overwritten, and the real config files are gitignored.
 
 ## Still needs your input
 
-Placeholders in `contacts.php.example` marked `REPLACE`:
+Placeholders in `contact-config.php.example` marked `REPLACE`:
 
 - **Brasil** — I couldn't find this page. Nothing links to it from `chrislacey.com`
   and no obvious subdomain resolves, so `brasil` points at a placeholder.
