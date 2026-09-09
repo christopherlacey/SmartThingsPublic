@@ -146,6 +146,32 @@ verify() {
 }
 
 
+
+# The secret path is a directory inside the docroot, so the docroot itself has
+# to not be listable -- otherwise Apache cheerfully returns the one directory
+# name the whole scheme depends on keeping quiet. verify() tests for this, but
+# preventing it is better than catching it after the fact.
+#
+# Nothing existing is ever overwritten: a real site index or an .htaccess you
+# already tuned stays exactly as it is, and we warn instead.
+protect_docroot() {
+  if [ ! -e "$HOST_ROOT/.htaccess" ]; then
+    printf 'Options -Indexes\n' > "$HOST_ROOT/.htaccess"
+    green "  wrote $HOST_ROOT/.htaccess (Options -Indexes)"
+  elif grep -qiE 'Options[[:space:]]+.*-Indexes' "$HOST_ROOT/.htaccess"; then
+    green "  docroot .htaccess already disables directory listing"
+  else
+    warn "  $HOST_ROOT/.htaccess exists but does not disable listing."
+    warn "  Add 'Options -Indexes' to it, or the secret path can be listed."
+  fi
+
+  # A docroot with no index is the other way a listing appears.
+  if [ ! -e "$HOST_ROOT/index.html" ] && [ ! -e "$HOST_ROOT/index.php" ]; then
+    printf '<!doctype html>\n<title>tesla.lacey.me</title>\n' > "$HOST_ROOT/index.html"
+    green "  wrote $HOST_ROOT/index.html (blank placeholder)"
+  fi
+}
+
 # Install from this checkout into DASH_DIR on the machine we are already on.
 # This is the path to use when you have sshed into the web server: cloning the
 # repo there and running this avoids needing a workstation with both a checkout
@@ -173,6 +199,8 @@ install_local() {
   install -m 644 "$SRC"/vendor/leaflet/images/*.png "$DASH_DIR/vendor/leaflet/images/"
 
   green "Files installed."
+
+  protect_docroot
 
   # Same rule as the remote path: never clobber real data, and never go live
   # showing placeholders.
