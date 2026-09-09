@@ -3,8 +3,12 @@
 A single-screen dashboard for the Model X centre display: where Chris, John and
 Addy each are, what each of them has on today, and their medical information.
 
-Target URL: `https://grok.lacey.me/TmX$23!/` — an unlisted path, which is the
+Target URL: `https://tesla.lacey.me/TmX$23!/` — an unlisted path, which is the
 only thing standing between this page and the open internet.
+
+`grok.lacey.me` is a redirect onto that URL, configured separately at the
+DNS/vhost level. Nothing in this directory sets it up or depends on it, and
+`deploy.sh` never touches it.
 
 ## Files
 
@@ -108,27 +112,45 @@ the car never fetches a half-written JSON.
 
 Two ways, depending on where you run it.
 
-**On the web server** (simplest — no ssh keys, no local checkout):
+**On the web server** — simplest, and the only option that works on shared
+hosting where you can't write to `/var/www`. Run the whole block; the first
+three lines are what put `deploy.sh` on the box in the first place:
 
 ```sh
 ssh myfsdev@lacey.me
 git clone -b claude/life-dashboard-tesla-6uz3mj \
   https://github.com/christopherlacey/SmartThingsPublic.git
 cd SmartThingsPublic/tesla-dashboard
-./deploy.sh --local          # seeds data.json, then stops
-$EDITOR /var/www/grok.lacey.me/'TmX$23!'/data.json
+./deploy.sh --local
+```
+
+That installs the site, seeds `data.json` from the template, and stops. It then
+prints the exact next two commands, with the path already quoted — the secret
+path contains `$` and `!`, which an unquoted paste will mangle. Roughly:
+
+```sh
+nano ~/tesla.lacey.me/'TmX$23!'/data.json
 ./deploy.sh --check
 ```
 
-**From a workstation** that has a checkout and can ssh to the host:
+Use `nano` (or `vi`) by name rather than `$EDITOR`, which is unset on many
+shared hosts — bash then tries to *execute* the path instead of editing it.
+
+**From a workstation** with a checkout and ssh access to the host:
 
 ```sh
 SSH_HOST=myfsdev@lacey.me ./deploy.sh
 ```
 
+The docroot is worked out from the URL host: `~/tesla.lacey.me` where that
+exists (shared hosting), otherwise `/var/www/tesla.lacey.me`. Override with
+`HOST_ROOT` if yours is elsewhere. Creating the directory does not create the
+vhost — the domain still has to exist in the hosting panel or nothing is served
+from it.
+
 Either way, `./deploy.sh --check` verifies the live site and changes nothing.
 
-The docroot and URL default to `grok.lacey.me` and the unlisted path; override
+The docroot and URL default to `tesla.lacey.me` and the unlisted path; override
 `BASE_URL` to move it, and the docroot follows automatically.
 
 The secret path contains `$` and `!`. Both are legal in a URL and on disk, but

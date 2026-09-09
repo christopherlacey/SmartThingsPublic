@@ -10,8 +10,12 @@
 #
 # Configure once (or export these in your shell):
 #   SSH_HOST   user@host for the web server, e.g. myfsdev@lacey.me
-#   HOST_ROOT  docroot of the subdomain, e.g. /var/www/grok.lacey.me
+#   HOST_ROOT  docroot of the subdomain. Defaults to ~/<domain> where that
+#              exists (shared hosting) and /var/www/<domain> otherwise.
 #   BASE_URL   public URL of the dashboard, if it differs from the default
+#
+# The car loads tesla.lacey.me. grok.lacey.me is a redirect onto it, configured
+# separately at the DNS/vhost level -- nothing in this script touches it.
 #
 # The dashboard lives at an unlisted path rather than a guessable one, so the
 # path itself is a secret. Two consequences the code below has to respect:
@@ -33,12 +37,25 @@ set -euo pipefail
 SECRET_PATH='TmX$23!'
 
 SSH_HOST="${SSH_HOST:-}"
-BASE_URL="${BASE_URL:-https://grok.lacey.me/$SECRET_PATH}"
+BASE_URL="${BASE_URL:-https://tesla.lacey.me/$SECRET_PATH}"
 
 # Derive the docroot from BASE_URL rather than hardcoding it, so overriding one
 # can't leave the other quietly pointing at a different host.
 BASE_HOST=$(printf '%s' "$BASE_URL" | sed -E 's#^https?://##; s#/.*##')
-HOST_ROOT="${HOST_ROOT:-/var/www/$BASE_HOST}"
+
+# Where the docroot lives depends on the kind of host. Shared hosting (this is
+# a DreamHost-style box: pdx1-shared-...) puts each domain under the user's home
+# directory and gives no write access to /var/www at all, so prefer ~/<domain>
+# and fall back to /var/www/<domain> only on a box that actually uses it.
+if [ -z "${HOST_ROOT:-}" ]; then
+  if [ -d "$HOME/$BASE_HOST" ]; then
+    HOST_ROOT="$HOME/$BASE_HOST"
+  elif [ -d "/var/www/$BASE_HOST" ]; then
+    HOST_ROOT="/var/www/$BASE_HOST"
+  else
+    HOST_ROOT="$HOME/$BASE_HOST"
+  fi
+fi
 DASH_DIR="${DASH_DIR:-$HOST_ROOT/$SECRET_PATH}"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -136,6 +153,13 @@ verify() {
 install_local() {
   info "Installing into $DASH_DIR (local)"
 
+  if [ ! -d "$HOST_ROOT" ]; then
+    warn "$HOST_ROOT does not exist yet — creating it."
+    warn "Note: on shared hosting the directory alone is not enough. The domain"
+    warn "$BASE_HOST also has to be added in the hosting panel, or nothing will"
+    warn "be served from here."
+  fi
+
   if ! mkdir -p "$DASH_DIR/vendor/leaflet/images" 2>/dev/null; then
     red "Cannot create $DASH_DIR — check the path and that you own it."
     red "If it belongs to the web user, re-run under that account."
@@ -157,9 +181,11 @@ install_local() {
   else
     install -m 640 "$SRC/data.example.json" "$DASH_DIR/data.json"
     warn "data.json did not exist. The example has been copied into place."
-    warn "Fill it in before the car sees this:"
-    warn "  \$EDITOR $DASH_DIR/data.json"
-    warn "Then re-run: ./deploy.sh --check"
+    warn "Fill it in before the car sees this, then re-run --check:"
+    warn ""
+    warn "  nano '$DASH_DIR/data.json'"
+    warn "  cd '$SRC' && ./deploy.sh --check"
+    warn ""
     exit 0
   fi
 }
@@ -203,7 +229,8 @@ if ssh "$SSH_HOST" "test -f '$DASH_DIR/data.json'"; then
 else
   ssh "$SSH_HOST" "cp '$DASH_DIR/data.example.json' '$DASH_DIR/data.json'"
   warn "data.json did not exist. The example has been copied into place."
-  warn "Fill it in before the car sees this, then re-run ./deploy.sh --check"
+  warn "Fill it in before the car sees this, then re-run --check:"
+  warn "  ssh $SSH_HOST nano \\'$DASH_DIR/data.json\\'"
   exit 0
 fi
 
