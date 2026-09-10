@@ -103,8 +103,15 @@ verify() {
     else red "  FAIL  $asset returned $c"; fail=1; fi
   done
 
+  local djcode; djcode=$(code "$BASE_URL/data.json")
   local dj; dj=$(fetch "$BASE_URL/data.json" || true)
-  if [ -z "$dj" ]; then
+  if [ "$djcode" = "403" ]; then
+    red "  FAIL  data.json returns 403 — the web server cannot read it."
+    red "        Fix: chmod 644 '$DASH_DIR/data.json'"
+    fail=1
+  elif [ "$djcode" = "404" ]; then
+    red "  FAIL  data.json is missing (404). Run ./deploy.sh --local first."; fail=1
+  elif [ -z "$dj" ]; then
     red "  FAIL  data.json is empty or unreachable"; fail=1
   elif ! printf '%s' "$dj" | python3 -m json.tool >/dev/null 2>&1; then
     red "  FAIL  data.json is not valid JSON"; fail=1
@@ -207,7 +214,12 @@ install_local() {
   if [ -f "$DASH_DIR/data.json" ]; then
     green "data.json already present — left untouched."
   else
-    install -m 640 "$SRC/data.example.json" "$DASH_DIR/data.json"
+    # 0644, not 0640. Tightening this looks appealing -- it is the file with the
+    # locations and medical records in it -- but on shared hosting Apache does
+    # not run in the user's group, so 0640 makes it unreadable to the web server
+    # and the dashboard renders empty. The file is served publicly over HTTP by
+    # design anyway; the unlisted path is what protects it, not the mode bits.
+    install -m 644 "$SRC/data.example.json" "$DASH_DIR/data.json"
     warn "data.json did not exist. The example has been copied into place."
     warn "Fill it in before the car sees this, then re-run --check:"
     warn ""
