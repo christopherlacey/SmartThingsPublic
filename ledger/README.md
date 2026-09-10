@@ -61,15 +61,30 @@ existing tab should need editing:
 ## Deploy
 
 ```sh
-./deploy.sh --dry-run                    # what would change
+./deploy.sh --dry-run                    # what would change, in order
+
 SSH_HOST=chris@your-web-host \
-LEDGER_DIR=/var/www/ledger \
+LEDGER_DIR=/var/www/the-real-docroot \
+STATE_OWNER=www-data \
   ./deploy.sh
+
 ./deploy.sh --check                      # verify the live site, change nothing
 ```
 
-First run seeds `ledger-config.php` from the template and stops so you can fill
-it in. Then load the schema once:
+`LEDGER_DIR` must be the docroot actually serving `c.lacey.me` — the default is
+a guess and almost certainly wrong.
+
+**The first run deploys nothing.** It creates the state directory, seeds both
+configs from the templates, and stops. That is deliberate: `header.php` requires
+the gate and the gate refuses to serve anything without a config, so copying the
+code before the config is real would take the site down until someone SSHed in
+to fix it. Fill the configs in and run it again; the second run copies the code
+and wires the gate last, so the switch that makes the site private only flips
+once everything it depends on is already there.
+
+A run that finds `REPLACE` still in either config stops the same way.
+
+Then load the schema once:
 
 ```sh
 mysql ledger < schema.mysql.sql          # or:
