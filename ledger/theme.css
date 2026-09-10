@@ -1010,3 +1010,96 @@ svg.usmap .pin-inferred .pin-dot { fill: var(--warn); }
 svg.usmap .pin-inferred .pin-halo { fill: var(--warn); }
 svg.usmap .pin-stale .pin-dot { fill: var(--text-faint); }
 svg.usmap .pin-stale .pin-halo { fill: var(--text-faint); }
+
+/* ---- Sign in ----------------------------------------------------------- */
+
+.signin-wrap {
+  max-width: 460px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  align-content: center;
+}
+
+.signin { text-align: center; }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+  margin: 0 0 10px;
+}
+
+.signin h1 { margin-bottom: 10px; }
+.signin .kicker { margin-bottom: 26px; }
+
+.signin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.signin-error { text-align: left; margin-bottom: 18px; }
+
+.signin-error.notice {
+  background: color-mix(in srgb, var(--danger-muted) 10%, var(--bg-raised));
+  border-color: color-mix(in srgb, var(--danger-muted) 40%, var(--border));
+}
+
+/* Google's button is a recognised shape — keep it neutral, not themed. */
+.btn-google {
+  width: 100%;
+  background: var(--bg-raised);
+  color: var(--text);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+  font-weight: 500;
+  padding: 13px 20px;
+}
+
+.btn-google:hover { border-color: var(--accent); }
+.btn-google svg { flex: none; }
+
+.signin-note,
+.signin-alt {
+  margin: 22px 0 0;
+  font-size: 0.84rem;
+  color: var(--text-faint);
+}
+
+/* One-time codes: wide, monospaced, unmistakably a code field. */
+.code-input {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  letter-spacing: 0.35em;
+  text-align: center;
+  padding: 14px 12px;
+}
+
+.code-input::placeholder { letter-spacing: 0.2em; }
+
+.secret-block {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 12px 0;
+  overflow-x: auto;
+  user-select: all;
+}
+
+.secret-uri {
+  font-size: 0.74rem;
+  word-break: break-all;
+  user-select: all;
+}
+
+.cl-footer .cl-note a { color: var(--text-faint); }
+.cl-footer .cl-note a:hover { color: var(--accent-deep); }

@@ -19,6 +19,15 @@ pattern as `connect/`.
 | `ledger-config.php.example` | Copy to `ledger-config.php`, fill in, **never commit**. |
 | `schema.sqlite.sql` / `schema.mysql.sql` | The two new tables. Use whichever matches your database. |
 | `import-transactions.php` | CLI importer for bank/card CSV exports. |
+| `ledger-auth.php` | **The gate.** Runs before every PHP request via `auto_prepend_file`. |
+| `login.php` | Sign in with Google, then the authenticator code. |
+| `oauth-callback.php` | Where Google sends the browser back. Checks every claim. |
+| `logout.php` | Drops the session. |
+| `ledger-totp.php` | RFC 6238 codes. Verified against the RFC's own test vectors. |
+| `ledger-2fa-setup.php` | Enrol the second factor. |
+| `ledger-auth-config.php.example` | Copy to `ledger-auth-config.php`, fill in, **never commit**. |
+| `htaccess.example` / `user.ini.example` | Rendered to `.htaccess` / `.user.ini` at deploy time. |
+| `test-auth.sh` | Runs the gate against a throwaway local site. 29 checks. |
 | `deploy.sh` | Backs up, copies, verifies. |
 
 ## Read this before deploying
@@ -177,16 +186,121 @@ A few things worth knowing:
   shopping right now — that needs a decision before it's worth building.
 - **Whether `index.php`/`people.php` should get the map**, and which of them.
 
-## One thing to look at
+## Sign-in
 
-`c.lacey.me` served every page of this dashboard — including Medical, and the
-full names and locations of 26 people — to an unauthenticated request from a
-throwaway cloud container. `noindex` keeps it out of search results but is not
-access control, and the pages set `Cache-Control: no-store` but nothing checks
-who is asking.
+The whole site is private. Every page — Overview, People, Medical, Trip, Change
+log, Finance, Shopping and the blog — turns away anyone who is not signed in.
 
-Nothing in this change makes that better or worse; Finance and Shopping simply
-inherit whatever protects the rest, which today is the obscurity of the URL.
-Given that the two new tabs add household spending to what's already there, it
-is worth deciding deliberately. Even HTTP basic auth at the Apache level, or an
-IP allowlist, would close it — happy to wire either up.
+**One identity gets in: `chris@chrislacey.com`.** The allow list lives in
+`ledger-auth-config.php` and is checked on every request, not just at sign-in,
+so removing an address takes effect immediately.
+
+That list is deliberately hand-written rather than read from the people table.
+That table is fed by public forms on `chrislacey.com` and `teeter.lacey.me`, so
+deriving access from it would let a form submission influence who can get in.
+
+### The two steps
+
+1. **Google.** Authorization-code flow with PKCE. The callback checks the
+   issuer, that the audience is this client, expiry, the nonce it minted for
+   this browser, that the address is *verified*, that it is on the allow list,
+   and that the `hd` claim matches the Workspace domain — so a personal Google
+   account cannot get in on a lookalike address. Whatever 2-step verification
+   Workspace enforces applies here, because Google is doing the authenticating.
+2. **A code from your authenticator.** A second factor the Ledger owns itself,
+   so access does not rest entirely on the Google session being sound. Set it
+   up at `/ledger-2fa-setup.php` once signed in.
+
+Until a TOTP secret is in the config, step 2 is skipped — that is the bootstrap
+that lets you sign in with Google alone the first time and enrol.
+
+There is no QR code on the enrolment page on purpose: drawing one would mean
+either shipping a QR encoder or sending the secret to an image service, and the
+second of those hands your second factor to a stranger. Google Authenticator
+takes a typed setup key.
+
+### How it covers pages whose source isn't here
+
+`ledger-auth.php` is loaded through PHP's `auto_prepend_file`, so it runs before
+every PHP request under the docroot — including `index.php`, `people.php` and
+the blog, none of whose source is in this repo. The gate does not depend on each
+page remembering to ask for it.
+
+`deploy.sh` renders both wirings, since which one applies depends on how PHP is
+run: `.htaccess` (`php_value`, mod_php) and `.user.ini` (PHP-FPM or CGI). Having
+both is harmless.
+
+Two consequences worth knowing:
+
+- **`auto_prepend_file` governs PHP only.** Static files are served straight off
+  disk, which is why `.htaccess` also denies `*.sql`, `*.example`, `*.md`, the
+  config files and the `deploy.sh` backups outright. `theme.css` stays readable
+  on purpose — the sign-in page needs it and it holds nothing.
+- **PHP caches `.user.ini`** for `user_ini.cache_ttl` seconds (300 by default),
+  so a change there can take five minutes to take effect.
+
+### What it fails to
+
+Closed, at every turn. A missing `ledger-auth-config.php` returns 503 rather
+than defaulting to open. A failed OAuth callback burns the `state` so it cannot
+be retried. Five bad codes lock the second step for fifteen minutes. A code that
+has been used once is refused for the rest of its 30-second window.
+
+### Sessions
+
+Cookies are `Secure`, `HttpOnly`, `SameSite=Lax` (Lax, not Strict — the OAuth
+return is a cross-site redirect). The session id is regenerated at each step, so
+nothing that existed before sign-in carries weight. Signed out after 12 hours
+idle or 30 days absolute, whichever comes first.
+
+The default session name is kept rather than changed, so anything else already
+using PHP's session on this host keeps working; the gate closes the session
+before handing control to the page, so a page calling `session_start()` itself
+behaves exactly as it did before.
+
+### Setting up the Google client
+
+Google Cloud console → APIs & Services → Credentials → **Create OAuth client
+ID** → Web application. Add `https://c.lacey.me/oauth-callback.php` as an
+authorised redirect URI, then put the client ID and secret in
+`ledger-auth-config.php`. On the OAuth consent screen, **Internal** is the right
+user type for a Workspace domain — it means no one outside the domain can even
+begin the flow.
+
+### The blog's own login
+
+`/blog/admin.php` has its own separate sign-in, written before this existed. Now
+that the gate covers `/blog/` too, that second login is redundant — you will be
+asked to sign in twice. Its source is not in this repo, so retiring it is a
+manual step: once you are happy the gate is working, remove its login check, and
+retire whatever credential it holds. Until then nothing is *less* safe; it is
+just two doors instead of one.
+
+### What is tested
+
+```sh
+./test-auth.sh        # 29 checks, no setup, nothing left behind
+```
+
+It stands up PHP's built-in server with `ledger-auth.php` wired through
+`auto_prepend_file` exactly as Apache does, then checks the properties that
+matter: every page redirecting while signed out, no page body leaking, a
+disallowed address refused, a wrong-case address accepted, idle and absolute
+timeouts, the second factor withheld until a code is entered, a replayed code
+refused, CSRF rejected, forged OAuth `state` refused, and 503 rather than open
+access when the config is missing.
+
+`ledger-totp.php` is separately verified against all six RFC 6238 test vectors
+plus replay refusal and clock drift either side.
+
+The Google round trip itself needs real credentials, so that is the one part
+only your first real sign-in can confirm.
+
+**One bug worth naming**, because the test suite now pins it: the first cut of
+the gate matched its public endpoints on the file *name*, which meant any file
+called `login.php` anywhere under the docroot was served without signing in —
+and blogs very often have one. `/blog/login.php` is a 404 today, so nothing was
+exposed, but it was a hole waiting for someone to add a file. The gate now
+matches the resolved absolute path, and `test-auth.sh` plants a decoy
+`blog/login.php` on every run to make sure it stays shut.
+

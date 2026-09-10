@@ -1,0 +1,56 @@
+<?php
+/**
+ * Copy to ledger-auth-config.php and fill in. NEVER commit the real file —
+ * it holds the OAuth client secret and the TOTP seed.
+ *
+ *   chmod 600 ledger-auth-config.php
+ */
+
+return [
+    /* ---- who is allowed in ------------------------------------------- */
+
+    // The only identities that may sign in. Compared case-insensitively
+    // against the verified email Google returns.
+    //
+    // This is a deliberate, hand-written list rather than a lookup against the
+    // people table: that table is fed by public forms on chrislacey.com and
+    // teeter.lacey.me, so deriving access from it would let a form submission
+    // influence who can get in.
+    'allowed_emails' => [
+        'chris@chrislacey.com',
+    ],
+
+    // Google Workspace domain. When set, the sign-in must also carry the `hd`
+    // claim for this domain, so a personal Gmail account that somehow ends up
+    // with a matching address string still cannot get in. Empty to disable.
+    'google_hd' => 'chrislacey.com',
+
+    /* ---- Google OAuth ------------------------------------------------- */
+    // Google Cloud console → APIs & Services → Credentials → OAuth client ID
+    // → Web application. Add the redirect URI below as an authorised redirect.
+
+    'google_client_id'     => 'REPLACE.apps.googleusercontent.com',
+    'google_client_secret' => 'REPLACE',
+    'redirect_uri'         => 'https://c.lacey.me/oauth-callback.php',
+
+    /* ---- second factor ------------------------------------------------ */
+
+    // Google Sign-In already carries whatever 2-step verification the Workspace
+    // account enforces. This is a second factor owned by the site itself, so
+    // access does not rest entirely on the Google session being sound.
+    //
+    // Leave the secret empty and visit ledger-2fa-setup.php to enrol.
+    'totp_enabled' => true,
+    'totp_secret'  => '',
+
+    /* ---- session ------------------------------------------------------ */
+
+    'idle_timeout'     => 12 * 3600,       // signed out after this long unused
+    'absolute_timeout' => 30 * 24 * 3600,  // and after this long regardless
+
+    /* ---- state -------------------------------------------------------- */
+
+    // Small writable directory for the TOTP replay counter and the failed
+    // attempt log. Keep it OUTSIDE the web root.
+    'state_dir' => '/var/lib/ledger',
+];
