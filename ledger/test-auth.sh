@@ -258,6 +258,26 @@ else
   PASS=$((PASS+$(grep -c PASS <<<"$lockout_out")))
 fi
 echo
+echo "The command line is not gated"
+# The gate returns early for CLI so cron and the importer keep working. The
+# constants have to sit above that return, or the file loads with all of its
+# functions and none of its constants.
+cat > "$TMP/cliprobe.php" <<'CLI'
+<?php
+$ok = function_exists('ledger_state_dir')
+   && defined('LEDGER_LOCKOUT') && defined('LEDGER_MAX_ATTEMPTS')
+   && defined('LEDGER_PUBLIC_FILES');
+echo $ok ? "CLI-OK" : "CLI-INCOMPLETE";
+CLI
+cliout=$(php -d auto_prepend_file="$TMP/ledger-auth.php" "$TMP/cliprobe.php" 2>&1)
+ok "loads whole on the CLI" "$cliout" "CLI-OK"
+impout=$(cd "$TMP" && php -d auto_prepend_file="$TMP/ledger-auth.php" import-transactions.php /dev/null 2>&1 | head -1)
+case "$impout" in
+  *Empty*|*Usage*|*Imported*|*Dry*) green "the importer still runs" ;;
+  *) red "the importer was blocked or broke: $impout" ;;
+esac
+
+echo
 echo "No PHP errors anywhere"
 grep -iE 'Fatal error|Parse error|Uncaught|Deprecated' "$TMP/srv.log" | head -3
 grep -qiE 'Fatal error|Parse error|Uncaught|Deprecated' "$TMP/srv.log" && red "PHP errors in the log" || green "server log is clean"

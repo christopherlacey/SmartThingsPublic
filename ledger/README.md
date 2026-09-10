@@ -27,7 +27,7 @@ pattern as `connect/`.
 | `ledger-2fa-setup.php` | Enrol the second factor. |
 | `ledger-auth-config.php.example` | Copy to `ledger-auth-config.php`, fill in, **never commit**. |
 | `htaccess.example` / `user.ini.example` | Rendered to `.htaccess` / `.user.ini` at deploy time. |
-| `test-auth.sh` | Runs the gate against a throwaway local site. 46 checks. |
+| `test-auth.sh` | Runs the gate against a throwaway local site. 48 checks. |
 | `deploy.sh` | Backs up, copies, verifies. |
 
 ## Read this before deploying
@@ -279,7 +279,7 @@ just two doors instead of one.
 ### What is tested
 
 ```sh
-./test-auth.sh        # 46 checks, no setup, nothing left behind
+./test-auth.sh        # 48 checks, no setup, nothing left behind
 ```
 
 It stands up PHP's built-in server with `ledger-auth.php` wired through
