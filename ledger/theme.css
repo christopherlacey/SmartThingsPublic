@@ -1103,3 +1103,25 @@ svg.usmap .pin-stale .pin-halo { fill: var(--text-faint); }
 
 .cl-footer .cl-note a { color: var(--text-faint); }
 .cl-footer .cl-note a:hover { color: var(--accent-deep); }
+
+/* A submit button that reads as a link — used where an action must be a POST
+   (signing out) but should not look like a call to action. */
+.linkish {
+  font: inherit;
+  color: var(--text-faint);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.linkish:hover { color: var(--accent-deep); }
+
+.cl-footer .signout-form { display: inline; }
+
+.signin-alt .linkish { color: var(--accent-deep); }
+
+/* .cl-note is a div, not a p, so the sign-out form can legally sit inside it. */
+.cl-footer .cl-note { line-height: 1.9; }

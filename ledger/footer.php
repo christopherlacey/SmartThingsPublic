@@ -15,14 +15,18 @@ if (function_exists('ledger_is_authenticated')) {
 }
 ?>
 <footer class="cl-footer">
-  <p class="cl-note">
+  <div class="cl-note">
     The Lacey Ledger · private · <?= e(date('Y-m-d H:i')) ?>
     <?php if ($LEDGER_WHO !== null): ?>
       <br>Signed in as <?= e($LEDGER_WHO) ?> ·
       <a href="/ledger-2fa-setup.php">Two-factor</a> ·
-      <a href="/logout.php">Sign out</a>
+      <?php /* A POST, so no other site can sign you out by linking here. */ ?>
+      <form method="post" action="/logout.php" class="signout-form">
+        <input type="hidden" name="csrf" value="<?= e(ledger_form_token()) ?>">
+        <button class="linkish" type="submit">Sign out</button>
+      </form>
     <?php endif; ?>
-  </p>
+  </div>
   <div class="cl-photo-row">
     <img class="cl-photo" src="https://chrislacey.com/chris-lacey-headshot-2026.png" alt="Chris Lacey" width="88" height="88" loading="lazy">
   </div>

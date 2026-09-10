@@ -27,7 +27,7 @@ pattern as `connect/`.
 | `ledger-2fa-setup.php` | Enrol the second factor. |
 | `ledger-auth-config.php.example` | Copy to `ledger-auth-config.php`, fill in, **never commit**. |
 | `htaccess.example` / `user.ini.example` | Rendered to `.htaccess` / `.user.ini` at deploy time. |
-| `test-auth.sh` | Runs the gate against a throwaway local site. 31 checks. |
+| `test-auth.sh` | Runs the gate against a throwaway local site. 46 checks. |
 | `deploy.sh` | Backs up, copies, verifies. |
 
 ## Read this before deploying
@@ -279,7 +279,7 @@ just two doors instead of one.
 ### What is tested
 
 ```sh
-./test-auth.sh        # 31 checks, no setup, nothing left behind
+./test-auth.sh        # 46 checks, no setup, nothing left behind
 ```
 
 It stands up PHP's built-in server with `ledger-auth.php` wired through
@@ -296,7 +296,31 @@ plus replay refusal and clock drift either side.
 The Google round trip itself needs real credentials, so that is the one part
 only your first real sign-in can confirm.
 
-### Three bugs found in review, all fixed and all pinned by tests
+### Signing out
+
+Sign-out is a POST with a token, never a link, so no other site can sign you
+out by pointing an image or a redirect at the URL. Visiting `/logout.php`
+directly asks rather than acting.
+
+A failed sign-in does not end a session that already exists, either — the OAuth
+callback drops only its own handshake keys. Otherwise
+`/oauth-callback.php?error=x` would be a one-click sign-out for anyone who could
+get your browser to follow a link.
+
+### The lockout
+
+Five wrong codes inside fifteen minutes locks the second step, and attempts made
+while locked keep the window alive rather than buying five fresh tries every
+quarter of an hour. It is a sliding window of failure timestamps, not a counter
+with a reset.
+
+Worth being clear about what this does and doesn't defend: the code form is only
+reachable once Google has already signed someone in as an allowed address, so
+brute-forcing it means already holding the Workspace account. That is also why
+attempts while locked can safely extend the lock — a stranger cannot reach this
+form at all, so it cannot be used to lock you out of your own dashboard.
+
+### Five bugs found in review, all fixed and all pinned by tests
 
 **The gate matched public endpoints on file name.** Any file called `login.php`
 anywhere under the docroot was served without signing in — and blogs very often
@@ -323,4 +347,13 @@ itself, so any page using it enforces sign-in on its own account; under the
 prepend that `require_once` is a no-op. Both config templates now recommend
 `php_admin_value` in the vhost or FPM pool, which no directory can override —
 worth doing, since pages whose source is not in this repo have no such backstop.
+
+**Sign-out was a plain link, and a failed callback ended a live session.** Either
+let any other site log you out. Both are closed above.
+
+**Constants sat below the CLI early-return.** PHP hoists function declarations
+but evaluates `const` in order, so on the CLI side `ledger-auth.php` had all its
+functions and none of its constants — a half-loaded state that would fatal the
+moment anything on the command line touched the rate limiter. The constants now
+sit above the return.
 

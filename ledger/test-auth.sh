@@ -198,6 +198,66 @@ else
 fi
 
 echo
+echo "Signing out is a POST"
+SIDO=$(mksess chris@chrislacey.com 60 60 yes)
+ok "a GET only asks"        "$(code -H "Cookie: PHPSESSID=$SIDO" "$B/logout.php")" "200"
+ok "still signed in after it" "$(code -H "Cookie: PHPSESSID=$SIDO" "$B/index.php")" "200"
+ok "a POST with no token"   "$(curl -sS -o /dev/null -w '%{http_code}' -b "PHPSESSID=$SIDO" -X POST -d "csrf=nope" "$B/logout.php")" "400"
+ok "still signed in after that" "$(code -H "Cookie: PHPSESSID=$SIDO" "$B/index.php")" "200"
+CSRFO=$(curl -sS -b "PHPSESSID=$SIDO" "$B/logout.php" | grep -oE 'value="[a-f0-9]{64}"' | head -1 | grep -oE '[a-f0-9]{64}')
+ok "a POST with the token"  "$(curl -sS -o /dev/null -w '%{http_code}' -b "PHPSESSID=$SIDO" -X POST -d "csrf=$CSRFO" "$B/logout.php")" "302"
+ok "and now signed out"     "$(code -H "Cookie: PHPSESSID=$SIDO" "$B/index.php")" "302"
+
+echo
+echo "A failed callback does not end a live session"
+# Any site can send a browser to /oauth-callback.php?error=x. That must not be
+# a way to sign someone out.
+SIDC=$(mksess chris@chrislacey.com 60 60 yes)
+curl -sS -o /dev/null -b "PHPSESSID=$SIDC" --max-redirs 0 "$B/oauth-callback.php?error=access_denied"
+ok "still signed in afterwards" "$(code -H "Cookie: PHPSESSID=$SIDC" "$B/index.php")" "200"
+curl -sS -o /dev/null -b "PHPSESSID=$SIDC" --max-redirs 0 "$B/oauth-callback.php?code=x&state=forged"
+ok "and after a forged state too" "$(code -H "Cookie: PHPSESSID=$SIDC" "$B/index.php")" "200"
+
+echo
+echo "Lockout window slides"
+LOCKDIR="$TMP/lockdir"; mkdir -p "$LOCKDIR"
+cp "$SRC/ledger-auth.php" "$SRC/ledger-totp.php" "$LOCKDIR/"
+cat > "$LOCKDIR/lockout.php" <<'LOCK'
+<?php
+$dir = __DIR__ . '/lockstate';
+@mkdir($dir, 0700, true);
+file_put_contents(__DIR__ . '/ledger-auth-config.php',
+    "<?php return ['state_dir'=>'$dir','allowed_emails'=>['a@b.c'],'google_hd'=>'',"
+  . "'google_client_id'=>'x','google_client_secret'=>'y','redirect_uri'=>'z',"
+  . "'totp_enabled'=>false,'totp_secret'=>'','idle_timeout'=>1,'absolute_timeout'=>1];");
+$_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/probe.php';
+require __DIR__ . '/ledger-auth.php';
+$bad = 0;
+$chk = function (string $what, bool $okv) use (&$bad) {
+    echo $okv ? "  PASS  $what\n" : "  FAIL  $what\n"; if (!$okv) $bad++;
+};
+$seed = fn(array $t) => ledger_state_write('login-attempts.json', ['failures' => $t]);
+$now = time();
+ledger_attempts_cleared();          $chk('a clean slate is not locked', ledger_locked_for() === 0);
+$seed([$now-5,$now-4,$now-3,$now-2,$now-1]); $chk('five recent failures lock it', ledger_locked_for() > 0);
+$seed([$now-5,$now-4,$now-3,$now-2]);        $chk('four do not', ledger_locked_for() === 0);
+$seed([$now-899,$now-800,$now-700,$now-600,$now-500]); $chk('locked while all five are in the window', ledger_locked_for() > 0);
+$seed([$now-901,$now-800,$now-700,$now-600,$now-500]); $chk('released once the oldest ages out', ledger_locked_for() === 0);
+$t = [];
+for ($i = 0; $i < 5; $i++) { $t[] = $now - 890 + $i; }
+for ($k = 800; $k >= 100; $k -= 100) { $t[] = $now - $k; }
+$seed($t);                          $chk('hammering keeps it locked', ledger_locked_for() > 0);
+ledger_attempts_cleared();          $chk('a correct code clears it', ledger_locked_for() === 0);
+exit($bad ? 1 : 0);
+LOCK
+lockout_out=$(cd "$LOCKDIR" && php lockout.php 2>&1)
+echo "$lockout_out" | sed 's/^/  /'
+if grep -q FAIL <<<"$lockout_out"; then
+  FAIL=$((FAIL+1))
+else
+  PASS=$((PASS+$(grep -c PASS <<<"$lockout_out")))
+fi
+echo
 echo "No PHP errors anywhere"
 grep -iE 'Fatal error|Parse error|Uncaught|Deprecated' "$TMP/srv.log" | head -3
 grep -qiE 'Fatal error|Parse error|Uncaught|Deprecated' "$TMP/srv.log" && red "PHP errors in the log" || green "server log is clean"

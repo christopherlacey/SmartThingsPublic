@@ -27,50 +27,16 @@ $totpRequired = !empty($config['totp_enabled']) && ($config['totp_secret'] ?? ''
 $googleDone   = is_string($_SESSION['ledger_email'] ?? null);
 $error        = null;
 
-/** Per-session CSRF token for the forms on this page. */
-if (empty($_SESSION['ledger_login_csrf'])) {
-    $_SESSION['ledger_login_csrf'] = bin2hex(random_bytes(32));
-}
-$csrf = $_SESSION['ledger_login_csrf'];
+/** Per-session token for the forms on this page. */
+$csrf = ledger_form_token();
 
-/* ------------------------------------------------------- rate limiting -- */
-
-const LEDGER_MAX_ATTEMPTS = 5;
-const LEDGER_LOCKOUT      = 900;   // 15 minutes
-
-function ledger_attempts(): array
-{
-    $s = ledger_state_read('login-attempts.json');
-    $since = (int) ($s['since'] ?? 0);
-    if (time() - $since > LEDGER_LOCKOUT) {
-        return ['count' => 0, 'since' => time()];
-    }
-    return ['count' => (int) ($s['count'] ?? 0), 'since' => $since];
-}
-
-function ledger_attempt_failed(): void
-{
-    $a = ledger_attempts();
-    ledger_state_write('login-attempts.json', [
-        'count' => $a['count'] + 1,
-        'since' => $a['since'] ?: time(),
-    ]);
-}
-
-function ledger_attempts_cleared(): void
-{
-    ledger_state_write('login-attempts.json', ['count' => 0, 'since' => time()]);
-}
-
-$attempts  = ledger_attempts();   // read-only; an unreadable store reads as zero
-$lockedFor = $attempts['count'] >= LEDGER_MAX_ATTEMPTS
-    ? LEDGER_LOCKOUT - (time() - $attempts['since'])
-    : 0;
+/** Seconds left on the lockout, 0 when clear. Re-read after any failure. */
+$lockedFor = ledger_locked_for();
 
 /* ------------------------------------------------------------- actions -- */
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!hash_equals($csrf, (string) ($_POST['csrf'] ?? ''))) {
+    if (!ledger_form_token_ok()) {
         http_response_code(400);
         exit('Bad CSRF token. Reload and try again.');
     }
@@ -117,6 +83,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'The second factor can’t be checked safely right now, so sign-in is '
                    . 'blocked. The server’s state directory is not writable.';
         } elseif ($lockedFor > 0) {
+            // Count this one too, so hammering the form keeps the window alive
+            // rather than buying five fresh tries every quarter of an hour.
+            // Safe from being used to lock the owner out by a stranger: this
+            // branch is only reachable once Google has already signed someone
+            // in as an allowed address.
+            try {
+                ledger_attempt_failed();
+            } catch (RuntimeException) {
+                // Already refusing; the count is the lesser worry.
+            }
+            $lockedFor = ledger_locked_for();
             $error = 'Too many attempts. Try again in ' . ceil($lockedFor / 60) . ' minutes.';
         } else {
             $state = ledger_state_read('totp.json');
@@ -225,7 +202,10 @@ $PAGE_TITLE = 'Sign in';
         </button>
       </form>
 
-      <p class="signin-alt"><a href="/logout.php">Use a different account</a></p>
+      <form method="post" action="/logout.php" class="signin-alt">
+        <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf) ?>">
+        <button class="linkish" type="submit">Use a different account</button>
+      </form>
 
     <?php else: ?>
       <p class="kicker">This dashboard is private. Sign in with your Google account to continue.</p>

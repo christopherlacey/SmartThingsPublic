@@ -23,16 +23,13 @@ $config  = ledger_auth_config();
 $account = (string) ($_SESSION['ledger_email'] ?? 'chris@chrislacey.com');
 $live    = ($config['totp_secret'] ?? '') !== '';
 
-if (empty($_SESSION['ledger_setup_csrf'])) {
-    $_SESSION['ledger_setup_csrf'] = bin2hex(random_bytes(32));
-}
-$csrf = $_SESSION['ledger_setup_csrf'];
+$csrf = ledger_form_token();
 
 $error = null;
 $proved = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!hash_equals($csrf, (string) ($_POST['csrf'] ?? ''))) {
+    if (!ledger_form_token_ok()) {
         http_response_code(400);
         exit('Bad CSRF token. Reload and try again.');
     }
@@ -87,8 +84,7 @@ require __DIR__ . '/header.php';
     </p>
     <pre class="secret-block">'totp_secret'  =&gt; '<?= e($candidate) ?>',</pre>
     <p class="line">
-      Then <a href="/logout.php">sign out</a> and back in to check the second
-      step appears. Keep a copy of the secret somewhere safe — losing both it
+      Then sign out and back in to check the second step appears. Keep a copy of the secret somewhere safe — losing both it
       and the phone means editing the config on the server to get back in.
     </p>
   </div>

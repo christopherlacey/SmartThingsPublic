@@ -22,6 +22,29 @@
 
 declare(strict_types=1);
 
+/* ----------------------------------------------------------- constants -- */
+/* Declared before the CLI early-return below: PHP hoists function
+   declarations but evaluates `const` in order, so anything defined after that
+   return would simply not exist on the CLI side — functions present,
+   constants missing, which is a confusing way to fail. */
+
+/**
+ * Endpoints that must stay reachable while signed out.
+ *
+ * Matched on the resolved absolute path, never on the file name. Comparing
+ * basenames would make ANY file called login.php anywhere under the docroot
+ * public — /blog/login.php, say — which is a gate with a hole in it.
+ */
+const LEDGER_PUBLIC_FILES = [
+    'login.php',
+    'oauth-callback.php',
+    'logout.php',
+];
+
+/** Wrong codes allowed inside the window before the second step locks. */
+const LEDGER_MAX_ATTEMPTS = 5;
+const LEDGER_LOCKOUT      = 900;   // 15 minutes
+
 // The CLI importer and any cron job must not be gated.
 if (PHP_SAPI === 'cli') {
     return;
@@ -194,20 +217,88 @@ function ledger_state_write(string $name, array $data): void
     @chmod($path, 0600);
 }
 
-/* --------------------------------------------------------- the gate ----- */
+/* ------------------------------------------------------- rate limiting -- */
+
 
 /**
- * Endpoints that must stay reachable while signed out.
+ * A sliding window of recent failures.
  *
- * Matched on the resolved absolute path, never on the file name. Comparing
- * basenames would make ANY file called login.php anywhere under the docroot
- * public — /blog/login.php, say — which is a gate with a hole in it.
+ * Timestamps rather than a counter: the old version anchored the window to the
+ * FIRST failure, so five wrong codes and a fifteen-minute wait reset it no
+ * matter how many attempts came in between. Keeping the times and pruning them
+ * means each new failure keeps the window alive, so someone hammering the form
+ * stays locked out instead of getting five fresh tries every quarter hour.
+ *
+ * @return int[] failure timestamps inside the window, oldest first
  */
-const LEDGER_PUBLIC_FILES = [
-    'login.php',
-    'oauth-callback.php',
-    'logout.php',
-];
+function ledger_recent_failures(): array
+{
+    $state = ledger_state_read('login-attempts.json');
+    $times = array_map('intval', (array) ($state['failures'] ?? []));
+    $cutoff = time() - LEDGER_LOCKOUT;
+
+    $recent = array_values(array_filter($times, static fn(int $t): bool => $t > $cutoff));
+    sort($recent);
+    return $recent;
+}
+
+function ledger_attempt_failed(): void
+{
+    $recent = ledger_recent_failures();
+    $recent[] = time();
+    // Never let the file grow without bound.
+    ledger_state_write('login-attempts.json', [
+        'failures' => array_slice($recent, -(LEDGER_MAX_ATTEMPTS * 4)),
+    ]);
+}
+
+function ledger_attempts_cleared(): void
+{
+    ledger_state_write('login-attempts.json', ['failures' => []]);
+}
+
+/** Seconds still to wait, or 0 when not locked. */
+function ledger_locked_for(): int
+{
+    $recent = ledger_recent_failures();
+    if (count($recent) < LEDGER_MAX_ATTEMPTS) {
+        return 0;
+    }
+    // Locked until the newest failure ages out of the window.
+    return max(0, (int) end($recent) + LEDGER_LOCKOUT - time());
+}
+
+$lockedFor = ledger_locked_for();   // read-only; an unreadable store reads as clear
+
+/* ---------------------------------------------------------- form token -- */
+
+/**
+ * Per-session token for the sign-in, sign-out and enrolment forms.
+ *
+ * Separate from ledger_csrf_token() in ledger-db.php, which guards the
+ * Shopping list: this one must work with no database configured at all, since
+ * signing in has to be possible while the database is down.
+ */
+function ledger_form_token(): string
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        ledger_session_start();
+    }
+    if (empty($_SESSION['ledger_form_csrf'])) {
+        $_SESSION['ledger_form_csrf'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['ledger_form_csrf'];
+}
+
+/** Constant-time check of a posted form token. */
+function ledger_form_token_ok(): bool
+{
+    $sent = $_POST['csrf'] ?? '';
+    return is_string($sent) && hash_equals(ledger_form_token(), $sent);
+}
+
+/* --------------------------------------------------------- the gate ----- */
+
 
 /** Is the script being served one of the sign-in endpoints in THIS directory? */
 function ledger_request_is_public(): bool

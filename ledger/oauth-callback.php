@@ -21,11 +21,20 @@ require_once __DIR__ . '/ledger-auth.php';
 ledger_session_start();
 $config = ledger_auth_config();
 
-/** Bounce back to the sign-in page with a reason, never with detail. */
+/**
+ * Bounce back to the sign-in page with a reason, never with detail.
+ *
+ * Only the handshake keys are dropped, deliberately. Clearing the signed-in
+ * session here would let any other site sign you out by pointing a link at
+ * /oauth-callback.php?error=x — a failed sign-in attempt is not a reason to
+ * end a session that already exists. Nothing below this point can be reached
+ * with a session that has passed its checks anyway: every caller runs before
+ * ledger_email is set.
+ */
 function ledger_login_failed(string $why): never
 {
-    ledger_auth_clear();
     unset($_SESSION['oauth_state'], $_SESSION['oauth_nonce'], $_SESSION['oauth_verifier']);
+    header('Cache-Control: no-store, no-cache, must-revalidate');
     header('Location: /login.php?error=' . urlencode($why), true, 302);
     exit;
 }
