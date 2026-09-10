@@ -1,0 +1,25 @@
+; The Lacey Ledger — deploy as `.user.ini` in the docroot.
+;
+; This is the PHP-FPM / CGI equivalent of the php_value line in .htaccess.
+; Harmless to have both: whichever one PHP is listening to takes effect.
+; deploy.sh rewrites the path to match LEDGER_DIR.
+;
+; NOTE: a .user.ini nearer the script wins, so one written into a subdirectory
+; (by a blog plugin, say) would unhook the gate there. Prefer setting
+; php_admin_value[auto_prepend_file] in the PHP-FPM pool config, which no
+; directory can override. See htaccess.example for the same note.
+;
+; Note that PHP caches .user.ini for user_ini.cache_ttl seconds (300 by
+; default), so a change here can take five minutes to be noticed.
+
+auto_prepend_file = "__LEDGER_DIR__/ledger-auth.php"
+
+; Errors go to the log, never to the browser — a stack trace on a signed-out
+; page would give away paths and query structure.
+display_errors = Off
+log_errors = On
+
+session.cookie_httponly = 1
+session.cookie_secure = 1
+session.cookie_samesite = "Lax"
+session.use_strict_mode = 1

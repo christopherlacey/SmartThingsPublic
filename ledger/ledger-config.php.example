@@ -1,0 +1,22 @@
+<?php
+/**
+ * Copy to ledger-config.php and fill in. NEVER commit ledger-config.php.
+ *
+ * Two ways to connect — pick one.
+ */
+
+return [
+    // (1) Reuse the PDO the site's db.php already opens. If db.php leaves its
+    //     handle in $pdo, $db or $dbh, flip this to true and ignore the rest.
+    'reuse_global_pdo' => false,
+
+    // (2) Or let the Finance/Shopping tabs open their own connection.
+    //     MySQL:  'mysql:host=localhost;dbname=ledger;charset=utf8mb4'
+    //     SQLite: 'sqlite:/var/lib/ledger/ledger.sqlite'
+    'dsn'  => 'mysql:host=localhost;dbname=ledger;charset=utf8mb4',
+    'user' => 'REPLACE',
+    'pass' => 'REPLACE',
+
+    // Shown on the Finance tab as the household's home currency.
+    'currency' => 'USD',
+];

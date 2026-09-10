@@ -1,0 +1,14 @@
+# Real config — holds the database password, the OAuth client secret and the
+# TOTP seed. Never commit.
+ledger-config.php
+ledger-auth-config.php
+
+# Rendered at deploy time from the .example templates.
+.htaccess
+.user.ini
+
+# Local test artefacts
+*.sqlite
+test-*.csv
+sess/
+state/

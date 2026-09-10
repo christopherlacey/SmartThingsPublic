@@ -1,0 +1,66 @@
+# The Lacey Ledger — Apache configuration for the docroot.
+#
+# Deploy as `.htaccess` in the directory serving c.lacey.me. deploy.sh does
+# this and rewrites the auto_prepend_file path to match LEDGER_DIR.
+#
+# Requires AllowOverride to permit Options/FileInfo/Limit in this directory.
+
+# ---- the gate -------------------------------------------------------------
+# Runs ledger-auth.php before EVERY PHP request under this directory, including
+# pages whose source is not in this repo. mod_php only — with PHP-FPM or CGI
+# this line does nothing and .user.ini carries it instead.
+#
+# BETTER, IF YOU CAN EDIT THE VHOST: auto_prepend_file is a per-directory
+# setting, so a .htaccess or .user.ini placed DEEPER in the tree overrides it
+# and silently unhooks the gate for that subtree. A blog plugin that writes its
+# own .user.ini would do exactly that. Setting it in the vhost with
+# php_admin_value instead cannot be overridden from any directory:
+#
+#   <Directory "__LEDGER_DIR__">
+#     php_admin_value auto_prepend_file "__LEDGER_DIR__/ledger-auth.php"
+#   </Directory>
+#
+# or, for PHP-FPM, in the pool config:
+#
+#   php_admin_value[auto_prepend_file] = __LEDGER_DIR__/ledger-auth.php
+#
+# header.php also requires the gate itself, so any page using it enforces
+# sign-in even if the prepend stops applying. Pages whose source is not in this
+# repo have no such backstop, which is why the vhost form is worth the trouble.
+<IfModule mod_php.c>
+  php_value auto_prepend_file "__LEDGER_DIR__/ledger-auth.php"
+</IfModule>
+<IfModule mod_php7.c>
+  php_value auto_prepend_file "__LEDGER_DIR__/ledger-auth.php"
+</IfModule>
+
+# ---- files that must never be served --------------------------------------
+# auto_prepend_file only governs PHP. Everything below is served straight off
+# disk by Apache, so it has to be refused here.
+<FilesMatch "\.(sql|example|log|sqlite|db|md|ini|json|csv)$">
+  Require all denied
+</FilesMatch>
+
+# Config files execute to an empty page rather than leaking, but there is no
+# reason to allow the request at all.
+<FilesMatch "^(ledger-auth-config|ledger-config)\.php$">
+  Require all denied
+</FilesMatch>
+
+# Timestamped backups left by deploy.sh.
+RedirectMatch 404 "/\.backup-"
+
+# Dotfiles.
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+
+# ---- transport and browser hardening --------------------------------------
+<IfModule mod_headers.c>
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "same-origin"
+</IfModule>
+
+Options -Indexes
