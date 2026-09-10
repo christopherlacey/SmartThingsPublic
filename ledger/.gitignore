@@ -1,0 +1,7 @@
+# Real config holds the database path and the location token. Never commit.
+config.php
+
+# The database itself holds medical, financial and personal records.
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
