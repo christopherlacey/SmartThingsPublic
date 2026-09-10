@@ -1,0 +1,164 @@
+# Deploy Chris Lacey's Dashboard to the DreamHost VPS.
+#
+# Runs on a push to master that touches ledger/, and on demand from the Actions
+# tab. Deliberately NOT on pull_request: secrets are not exposed to fork pull
+# requests anyway, but a deploy should only ever come from the branch that has
+# been reviewed and merged.
+#
+# ── One-time setup ────────────────────────────────────────────────────────────
+# Add these under Settings → Secrets and variables → Actions → New repository
+# secret. They are encrypted, are never printed by this workflow, and are not
+# readable by anyone who forks this repository:
+#
+#   DEPLOY_SSH_KEY   The PRIVATE half of a key pair made specifically for
+#                    deploying. Do not reuse a personal key:
+#                        ssh-keygen -t ed25519 -f ~/.ssh/ledger_deploy -C ledger-deploy
+#                    Put the PUBLIC half (~/.ssh/ledger_deploy.pub) into
+#                    ~/.ssh/authorized_keys on the VPS, and paste the private
+#                    half (~/.ssh/ledger_deploy) here.
+#
+#   DEPLOY_HOST      The VPS hostname, e.g. ps123456.dreamhostps.com
+#   DEPLOY_USER      The shell username on the VPS
+#
+# Optional, with sensible defaults:
+#   DEPLOY_APP_DIR   default ~/ledger        (code; must NOT be web-served)
+#   DEPLOY_DATA_DIR  default ~/ledger-data   (database and documents)
+#
+# ── What it does and does not do ──────────────────────────────────────────────
+# It copies code and applies any new database tables. It never touches
+# config.php, the database, or the stored documents — those live on the server
+# and are excluded from the sync.
+#
+# It cannot set your password or enrol your authenticator: doing that from CI
+# would mean putting your password into CI. Run ./bin/first-run.sh over SSH once,
+# the first time. After that every deploy is this workflow.
+
+name: Deploy dashboard
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'ledger/**'
+      - '.github/workflows/deploy-ledger.yml'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why this manual deploy'
+        required: false
+        default: 'manual'
+
+# One deploy at a time. Two overlapping rsyncs into the same directory is a good
+# way to serve half of one version and half of another.
+concurrency:
+  group: deploy-ledger
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # No repository token needed — this job only reads the checkout and talks to
+    # the VPS over SSH.
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Sanity-check the PHP before shipping it
+        run: |
+          php -v
+          fail=0
+          while IFS= read -r f; do
+            php -l "$f" > /dev/null || { echo "syntax error: $f"; fail=1; }
+          done < <(find ledger -name '*.php' -not -name 'config.php')
+          bash -n ledger/bin/first-run.sh
+          bash -n ledger/deploy.sh
+          [ "$fail" -eq 0 ] || exit 1
+          echo "all PHP parses, shell scripts parse"
+
+      - name: Refuse to ship a config or a database
+        run: |
+          # config.php holds the location token; the database holds medical and
+          # financial records. Neither belongs in git, and the sync below excludes
+          # them — but if one were ever committed, stop here rather than push it
+          # to a web server.
+          if git ls-files --error-unmatch ledger/config.php 2>/dev/null; then
+            echo "ledger/config.php is committed. Remove it before deploying."; exit 1
+          fi
+          if git ls-files 'ledger/**/*.sqlite' 'ledger/*.sqlite' | grep -q .; then
+            echo "A database file is committed. Remove it before deploying."; exit 1
+          fi
+          echo "no config or database in the repository"
+
+      - name: Set up the deploy key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          test -n "$DEPLOY_SSH_KEY" || { echo "DEPLOY_SSH_KEY is not set — see the header of this file"; exit 1; }
+          test -n "$DEPLOY_HOST"    || { echo "DEPLOY_HOST is not set — see the header of this file"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Pin the host key on first contact rather than disabling checking.
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Copy the code
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          APP_DIR: ${{ secrets.DEPLOY_APP_DIR || 'ledger' }}
+        run: |
+          ssh -o BatchMode=yes "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$APP_DIR'"
+          # --delete keeps the server matching the repository, so a file removed
+          # here is removed there. The excludes are what stops that deleting your
+          # config, your database and your documents.
+          rsync -az --delete \
+            --exclude 'config.php' \
+            --exclude '*.sqlite' --exclude '*.sqlite-wal' --exclude '*.sqlite-shm' \
+            --exclude 'documents/' \
+            -e "ssh -o BatchMode=yes" \
+            ledger/ "$DEPLOY_USER@$DEPLOY_HOST:$APP_DIR/"
+          ssh -o BatchMode=yes "$DEPLOY_USER@$DEPLOY_HOST" "chmod +x '$APP_DIR'/bin/*.sh '$APP_DIR'/deploy.sh 2>/dev/null || true"
+          echo "code synced to $APP_DIR"
+
+      - name: Apply the schema
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          APP_DIR: ${{ secrets.DEPLOY_APP_DIR || 'ledger' }}
+        run: |
+          # DreamHost's default `php` is often an old build; find the newest one.
+          # init-db.php only creates what is missing, so this is safe to re-run.
+          ssh -o BatchMode=yes "$DEPLOY_USER@$DEPLOY_HOST" bash -se <<REMOTE
+          set -eu
+          cd "$APP_DIR"
+          if [ ! -f config.php ]; then
+            echo "config.php is not on the server yet."
+            echo "Run ./bin/first-run.sh over SSH once to create it, set your password"
+            echo "and enrol your authenticator. Skipping the schema step for now."
+            exit 0
+          fi
+          PHPBIN=\$(ls -d /usr/local/php*/bin/php 2>/dev/null | sort -V | tail -1)
+          PHPBIN=\${PHPBIN:-\$(command -v php)}
+          echo "using \$PHPBIN (\$(\$PHPBIN -r 'echo PHP_VERSION;'))"
+          "\$PHPBIN" bin/init-db.php
+          REMOTE
+
+      - name: Check the site is not answering anonymously
+        run: |
+          # The whole point of the rebuild. A 200 here means the old pages are
+          # still being served and the deploy has not actually taken effect.
+          code=$(curl -sS -o /dev/null --max-time 20 -w '%{http_code}' https://c.lacey.me/index.php || echo 000)
+          login=$(curl -sS -o /dev/null --max-time 20 -w '%{http_code}' https://c.lacey.me/login.php || echo 000)
+          echo "index.php -> $code   login.php -> $login"
+          if [ "$code" = "302" ] && [ "$login" = "200" ]; then
+            echo "::notice::Dashboard is live and gated — anonymous requests are redirected to sign-in."
+          elif [ "$login" = "200" ]; then
+            echo "::warning::login.php is up but index.php returned $code (expected 302). Check the deploy."
+          else
+            echo "::warning::c.lacey.me is still serving the old pages (index.php $code, login.php $login). The web directory has not been pointed at ledger/public yet — see ledger/README.md."
+          fi

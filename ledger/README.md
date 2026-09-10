@@ -114,7 +114,40 @@ php bin/seed-example.php --wipe    # when you're done looking
 `seed-example.php` refuses to run against a database that already has people in
 it, so it can't land on top of real records.
 
-### Deploying
+### Deploying automatically from GitHub
+
+`.github/workflows/deploy-ledger.yml` deploys on every push to `master` that
+touches `ledger/`, and on demand from the Actions tab. Three secrets set it up,
+under **Settings → Secrets and variables → Actions**:
+
+| Secret | What |
+|---|---|
+| `DEPLOY_SSH_KEY` | The private half of a key pair made **only** for deploying — not a personal key. |
+| `DEPLOY_HOST` | The VPS hostname, e.g. `ps123456.dreamhostps.com`. |
+| `DEPLOY_USER` | The shell username on the VPS. |
+
+```sh
+ssh-keygen -t ed25519 -f ~/.ssh/ledger_deploy -C ledger-deploy
+ssh-copy-id -i ~/.ssh/ledger_deploy.pub you@your-vps      # public half onto the server
+pbcopy < ~/.ssh/ledger_deploy                             # private half into the secret
+```
+
+Secrets are encrypted and are not exposed to pull requests from forks, so this
+is safe in a public repository. The workflow never prints them.
+
+It syncs the code and applies any new tables. It never touches `config.php`, the
+database or the stored documents — those live on the server and are excluded
+from the sync, so a deploy cannot overwrite your records.
+
+What it deliberately cannot do is set your password or enrol your authenticator:
+that would mean putting your password into CI. Run `./bin/first-run.sh` over SSH
+once, the first time. Every deploy after that is just a push.
+
+The last step checks `c.lacey.me` and says plainly whether anonymous requests
+are being turned away yet — so a deploy that copied files but did not actually
+take effect shows up as a warning rather than a green tick.
+
+### Deploying by hand
 
 ```sh
 SSH_HOST=chris@your-host \
