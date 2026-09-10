@@ -1,0 +1,1012 @@
+/* ==========================================================================
+   The Lacey Ledger — shared theme
+   Design tokens and type ported from chrislacey.com so the Ledger and the
+   public site read as one system: same palette, same fonts, same restraint.
+
+   This file styles the markup the existing tabs ALREADY emit (.card, .who,
+   .where, .line, .tag, .mono, tables …), so dropping it in restyles every
+   tab without editing a single page.
+   ========================================================================== */
+
+/* ---- Tokens (chrislacey.com) ------------------------------------------- */
+
+:root {
+  --bg: #F5F8FA;
+  --bg-raised: #FFFFFF;
+  --bg-sunken: #ECF1F5;
+  --text: #101823;
+  --text-soft: #56677A;
+  --text-faint: #8B9AAA;
+  --border: #DEE6ED;
+  --accent: #0EA5E9;
+  --accent-deep: #0369A1;
+  --accent-soft: #E3F4FD;
+  --focus-ring: rgba(14, 165, 233, 0.35);
+  --shadow: 0 1px 2px rgba(16, 24, 35, 0.04), 0 8px 24px -12px rgba(16, 24, 35, 0.12);
+  --shadow-lift: 0 2px 4px rgba(16, 24, 35, 0.05), 0 16px 40px -16px rgba(16, 24, 35, 0.2);
+  --danger-muted: #C24A50;
+
+  /* Ledger-specific semantics, derived from the palette above. */
+  --ok: #2F855A;
+  --ok-soft: #E4F3EA;
+  --warn: #B45309;
+  --warn-soft: #FBF0E2;
+  --spend: #C24A50;
+  --income: #2F855A;
+
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Fraunces", ui-serif, Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0A0F16;
+    --bg-raised: #121A24;
+    --bg-sunken: #0E151E;
+    --text: #EAF1F7;
+    --text-soft: #92A3B4;
+    --text-faint: #5E6E7E;
+    --border: #223040;
+    --accent: #38BDF8;
+    --accent-deep: #7DD3FC;
+    --accent-soft: #0F2836;
+    --focus-ring: rgba(56, 189, 248, 0.35);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+    --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.35), 0 16px 40px -16px rgba(0, 0, 0, 0.65);
+    --danger-muted: #D9878C;
+
+    --ok: #6EE7A8;
+    --ok-soft: #0F2A1E;
+    --warn: #FBBF24;
+    --warn-soft: #2A2113;
+    --spend: #D9878C;
+    --income: #6EE7A8;
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0A0F16;
+  --bg-raised: #121A24;
+  --bg-sunken: #0E151E;
+  --text: #EAF1F7;
+  --text-soft: #92A3B4;
+  --text-faint: #5E6E7E;
+  --border: #223040;
+  --accent: #38BDF8;
+  --accent-deep: #7DD3FC;
+  --accent-soft: #0F2836;
+  --focus-ring: rgba(56, 189, 248, 0.35);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.35), 0 16px 40px -16px rgba(0, 0, 0, 0.65);
+  --danger-muted: #D9878C;
+
+  --ok: #6EE7A8;
+  --ok-soft: #0F2A1E;
+  --warn: #FBBF24;
+  --warn-soft: #2A2113;
+  --spend: #D9878C;
+  --income: #6EE7A8;
+
+  color-scheme: dark;
+}
+
+/* ---- Base -------------------------------------------------------------- */
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+/* A whisper of texture so large empty areas aren't dead flat. Two very low
+   opacity radial washes, fixed so they don't travel with scroll. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 50% at 12% -8%,
+      color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%),
+    radial-gradient(ellipse 70% 45% at 92% 4%,
+      color-mix(in srgb, var(--accent-deep) 7%, transparent), transparent 70%);
+}
+
+a { color: var(--accent-deep); }
+
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  border-radius: 6px;
+}
+
+.wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 28px 24px 56px;
+  position: relative;
+}
+
+@media (max-width: 560px) {
+  .wrap { padding: 20px 16px 40px; }
+}
+
+/* ---- Navigation -------------------------------------------------------- */
+
+nav {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0 0 30px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg-raised) 78%, transparent);
+  box-shadow: var(--shadow);
+  position: sticky;
+  top: 12px;
+  z-index: 40;
+  backdrop-filter: saturate(1.6) blur(12px);
+  -webkit-backdrop-filter: saturate(1.6) blur(12px);
+}
+
+nav a {
+  position: relative;
+  text-decoration: none;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 8px 13px;
+  border-radius: 10px;
+  white-space: nowrap;
+  transition: color 140ms ease, background 140ms ease;
+}
+
+nav a:hover { color: var(--text); background: var(--bg-sunken); }
+
+nav a.on {
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+/* Underline that slides between tabs across a cross-document view transition. */
+nav a.on::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  view-transition-name: nav-underline;
+}
+
+@media (max-width: 560px) {
+  nav {
+    position: static;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  nav::-webkit-scrollbar { display: none; }
+}
+
+/* ---- Headings ---------------------------------------------------------- */
+
+h1 {
+  font-family: var(--font-serif);
+  font-weight: 560;
+  font-optical-sizing: auto;
+  font-size: clamp(1.9rem, 5vw, 2.5rem);
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  margin: 0 0 6px;
+  text-wrap: balance;
+}
+
+h1 span { color: var(--accent-deep); }
+
+.kicker {
+  color: var(--text-soft);
+  font-size: 1.02rem;
+  margin: 0 0 30px;
+  text-wrap: pretty;
+}
+
+h2 {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+  margin: 40px 0 14px;
+  padding: 0;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Hairline that fills the rest of the row after the label. */
+h2::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(to right, var(--border), transparent);
+}
+
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 520;
+  font-size: 1.15rem;
+  margin: 0 0 10px;
+}
+
+/* ---- Cards ------------------------------------------------------------- */
+
+.card {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 17px 19px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+  container-type: inline-size;
+}
+
+a.card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+a.card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: var(--shadow-lift);
+}
+
+a.card:active { transform: translateY(0); }
+
+.who {
+  font-size: 1.06rem;
+  font-weight: 600;
+  margin: 0 0 3px;
+  text-wrap: pretty;
+}
+
+.where {
+  color: var(--text-soft);
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+.line {
+  margin: 9px 0 0;
+  font-size: 0.96rem;
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.line.empty,
+.empty {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.86rem;
+}
+
+/* ---- Tags -------------------------------------------------------------- */
+
+.tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-sunken);
+  color: var(--text-faint);
+  margin-left: 8px;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+.tag.confirmed {
+  color: var(--ok);
+  background: var(--ok-soft);
+  border-color: color-mix(in srgb, var(--ok) 30%, transparent);
+}
+
+.tag.inferred {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: color-mix(in srgb, var(--warn) 30%, transparent);
+}
+
+.tag.stale {
+  color: var(--text-faint);
+  background: var(--bg-sunken);
+  border-color: var(--border);
+}
+
+/* The Overview timeline marks the live block with `now`. Make it read live. */
+.tag.confirmed:is(:only-of-type) { position: relative; }
+
+/* ---- Change log diffs -------------------------------------------------- */
+
+.old {
+  color: var(--danger-muted);
+  background: color-mix(in srgb, var(--danger-muted) 10%, transparent);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger-muted) 55%, transparent);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+.new {
+  color: var(--ok);
+  background: var(--ok-soft);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+/* ---- Tables ------------------------------------------------------------ */
+
+.scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow);
+  /* Fade the right edge while there is more table to scroll to. */
+  background-image: linear-gradient(to right,
+    transparent calc(100% - 40px),
+    color-mix(in srgb, var(--bg-raised) 92%, transparent));
+  background-attachment: local;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  background: var(--bg-sunken);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  vertical-align: top;
+  text-wrap: pretty;
+}
+
+tbody tr { transition: background 120ms ease; }
+tbody tr:hover { background: var(--bg-sunken); }
+
+td.num, th.num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---- Lists ------------------------------------------------------------- */
+
+ul { margin: 8px 0 0; padding-left: 1.1rem; }
+li { margin: 4px 0; text-wrap: pretty; }
+
+/* ---- Buttons & fields -------------------------------------------------- */
+
+.btn {
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  padding: 10px 18px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 80ms ease, filter 120ms ease, background 120ms ease;
+}
+
+.btn:active { transform: translateY(1px); }
+
+.btn-primary { background: var(--accent); color: #06222E; }
+.btn-primary:hover { filter: brightness(1.05); }
+
+.btn-ghost {
+  background: var(--bg-raised);
+  color: var(--accent-deep);
+  border-color: var(--border);
+}
+.btn-ghost:hover { border-color: var(--accent); }
+
+.btn-quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-faint);
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+.btn-quiet:hover { color: var(--danger-muted); background: var(--bg-sunken); }
+
+input, select, textarea {
+  font: inherit;
+  font-size: 0.94rem;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 13px;
+  width: 100%;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--focus-ring);
+}
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+/* ---- Pager ------------------------------------------------------------- */
+
+.pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 28px;
+  font-size: 0.92rem;
+}
+
+/* ---- Footer (existing .cl-footer markup) ------------------------------- */
+
+.cl-footer,
+footer {
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.cl-footer .cl-note {
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  margin-bottom: 18px;
+}
+
+.cl-footer .cl-photo-row { text-align: center; margin-bottom: 18px; }
+
+.cl-footer .cl-photo,
+footer img {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--bg-raised);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.cl-footer .cl-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.cl-footer .cl-links-l,
+.cl-footer .cl-links-r { display: flex; flex-wrap: wrap; gap: 18px; }
+
+.cl-footer a,
+footer a { text-decoration: underline; text-underline-offset: 3px; }
+
+.cl-footer .cl-blue { color: var(--accent-deep); }
+
+.cl-footer .cl-red {
+  color: var(--danger-muted);
+  text-decoration-color: color-mix(in srgb, var(--danger-muted) 45%, transparent);
+}
+.cl-footer .cl-red:hover { text-decoration-color: var(--danger-muted); }
+
+@media (max-width: 480px) {
+  .cl-footer .cl-links { flex-direction: column; text-align: center; }
+}
+
+/* ---- Cross-document view transitions ----------------------------------- */
+/* Tabs are separate PHP pages; this makes moving between them a soft cross
+   fade instead of a white flash, with the nav underline sliding to the new
+   tab. Browsers without support just navigate normally. */
+
+@view-transition { navigation: auto; }
+
+::view-transition-old(root) { animation: vt-out 140ms ease both; }
+::view-transition-new(root) { animation: vt-in 220ms ease both; }
+
+@keyframes vt-out { to { opacity: 0; } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* ---- Motion & print ---------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+  @view-transition { navigation: none; }
+}
+
+@media print {
+  body::before, nav, .btn { display: none !important; }
+  .card, .scroll { box-shadow: none; break-inside: avoid; }
+  .wrap { max-width: none; padding: 0; }
+}
+
+/* ==========================================================================
+   Finance & Shopping components
+   ========================================================================== */
+
+/* ---- Notices ----------------------------------------------------------- */
+
+.card.notice {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+.card.notice code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: color-mix(in srgb, var(--bg-raised) 70%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+/* ---- Period switcher --------------------------------------------------- */
+
+.periods {
+  display: inline-flex;
+  gap: 3px;
+  padding: 4px;
+  margin-bottom: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow);
+}
+
+.period {
+  text-decoration: none;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  font-weight: 500;
+  padding: 6px 15px;
+  border-radius: var(--radius-pill);
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.period:hover { background: var(--bg-sunken); color: var(--text); }
+.period.on { background: var(--accent); color: #06222E; font-weight: 600; }
+
+/* ---- Stat tiles -------------------------------------------------------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.stat {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 15px 17px;
+  box-shadow: var(--shadow);
+}
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 7px;
+}
+
+.stat-value {
+  font-family: var(--font-serif);
+  font-weight: 560;
+  font-size: 1.6rem;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-note {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  margin-top: 5px;
+}
+
+/* Direction is carried by the sign in the value itself; this only tints it. */
+.is-down { color: var(--spend); }
+.is-up   { color: var(--income); }
+
+/* ---- Charts ------------------------------------------------------------ */
+
+.chart-card { padding: 18px 20px 14px; }
+
+/* Bars stretch to fill the width; every label is HTML beside the plot, so
+   nothing text-shaped is ever caught in a non-uniform scale. */
+.chart {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 10px;
+}
+
+.chart-y {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 200px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-faint);
+}
+
+/* Nudge the labels so each sits on its gridline rather than beside it. */
+.chart-y span { transform: translateY(-0.45em); }
+.chart-y span:first-child { transform: translateY(-0.1em); }
+
+.chart-plot { min-width: 0; }
+
+svg.plot {
+  display: block;
+  width: 100%;
+  height: 200px;
+}
+
+svg.plot .grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  vector-effect: non-scaling-stroke;
+}
+
+svg.plot .axis-line {
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+svg.plot .bar {
+  fill: var(--accent);
+  transition: fill 120ms ease;
+}
+
+svg.plot .bar:hover { fill: var(--accent-deep); }
+
+svg.plot .bar-zero { fill: var(--border); }
+
+.chart-x {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-faint);
+}
+
+.chart-note { margin-top: 10px; font-size: 0.86rem; }
+
+svg.spark {
+  width: 120px;
+  height: 28px;
+  flex: none;
+  overflow: visible;
+}
+
+svg.spark polyline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.trend-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+/* ---- Ranked bars ------------------------------------------------------- */
+
+.ranks { display: flex; flex-direction: column; gap: 9px; }
+
+.rank {
+  display: grid;
+  grid-template-columns: minmax(112px, 1fr) 2fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.rank-label {
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank-track {
+  height: 9px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-sunken);
+  overflow: hidden;
+}
+
+.rank-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  min-width: 3px;
+}
+
+.rank-value { font-size: 0.82rem; color: var(--text-soft); }
+
+@container (max-width: 340px) {
+  .rank { grid-template-columns: 1fr auto; }
+  .rank-track { grid-column: 1 / -1; }
+}
+
+/* ---- Two-up ------------------------------------------------------------ */
+
+.two-up {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+}
+
+/* ---- Day accordions ---------------------------------------------------- */
+
+details.day { padding: 0; overflow: hidden; }
+
+details.day > summary {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+  transition: background 120ms ease;
+}
+
+details.day > summary::-webkit-details-marker { display: none; }
+details.day > summary:hover { background: var(--bg-sunken); }
+details.day[open] > summary { border-bottom: 1px solid var(--border); }
+
+.day-date { font-weight: 600; }
+
+.day-count {
+  color: var(--text-faint);
+  font-size: 0.76rem;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}
+
+.day-total { font-weight: 600; font-size: 0.95rem; }
+
+details.day .scroll { border: none; border-radius: 0; box-shadow: none; }
+
+details.day td .where { display: block; font-size: 0.8rem; }
+
+/* ---- Shopping ---------------------------------------------------------- */
+
+.add-form { padding: 16px 18px; margin-bottom: 22px; }
+
+.add-grid {
+  display: grid;
+  grid-template-columns: 2fr 0.8fr 1.1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+@media (max-width: 720px) {
+  .add-grid { grid-template-columns: 1fr 1fr; }
+  .add-grid .add-item { grid-column: 1 / -1; }
+  .add-grid .btn { grid-column: 1 / -1; }
+}
+
+ul.list { list-style: none; margin: 0; padding: 0; }
+
+/* Aisle headings sit close to their items; the list should read dense. */
+ul.list + h2, .add-form + h2 { margin-top: 26px; }
+
+.item-body .tag {
+  margin-left: 0;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+li.item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  margin-bottom: 8px;
+  box-shadow: var(--shadow);
+  transition: border-color 140ms ease, opacity 140ms ease;
+}
+
+li.item:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+
+.item-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.item-name { font-size: 1rem; font-weight: 500; }
+
+.item-check { display: flex; flex: none; }
+
+/* A checkbox that is really a submit button, so the list works without JS. */
+.tick {
+  width: 23px;
+  height: 23px;
+  padding: 0;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 7px;
+  background: var(--bg-raised);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 140ms ease, border-color 140ms ease, transform 80ms ease;
+}
+
+.tick:hover { border-color: var(--accent); background: var(--accent-soft); }
+.tick:active { transform: scale(0.92); }
+
+.tick span {
+  width: 11px;
+  height: 6px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg) translate(1px, -1px);
+  opacity: 0;
+  color: var(--accent-deep);
+  transition: opacity 120ms ease;
+}
+
+.tick:hover span { opacity: 0.35; }
+
+.tick.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.tick.is-on span { opacity: 1; color: #06222E; }
+
+ul.list.done li.item { opacity: 0.6; }
+ul.list.done .item-name { text-decoration: line-through; }
+ul.list.done li.item:hover { opacity: 1; }
+
+/* ---- Map --------------------------------------------------------------- */
+
+.map-card { padding: 10px 12px 14px; }
+
+svg.usmap {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+svg.usmap .usmap-land path {
+  fill: var(--bg-sunken);
+  stroke: var(--bg-raised);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+svg.usmap .pin-halo {
+  fill: var(--accent);
+  opacity: 0.16;
+  transition: opacity 160ms ease, r 160ms ease;
+}
+
+svg.usmap .pin-dot {
+  fill: var(--accent);
+  stroke: var(--bg-raised);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+svg.usmap .pin-count {
+  fill: var(--bg-raised);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 500;
+  text-anchor: middle;
+}
+
+svg.usmap .pin { cursor: default; }
+svg.usmap a .pin { cursor: pointer; }
+svg.usmap .pin:hover .pin-halo { opacity: 0.3; }
+
+/* Status rides on top of the accent, and each pin carries a <title> too, so
+   the state is never colour-alone. */
+svg.usmap .pin-inferred .pin-dot { fill: var(--warn); }
+svg.usmap .pin-inferred .pin-halo { fill: var(--warn); }
+svg.usmap .pin-stale .pin-dot { fill: var(--text-faint); }
+svg.usmap .pin-stale .pin-halo { fill: var(--text-faint); }

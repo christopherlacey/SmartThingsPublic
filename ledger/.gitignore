@@ -1,0 +1,6 @@
+# Real config — holds the database password. Never commit.
+ledger-config.php
+
+# Local test artefacts
+*.sqlite
+test-*.csv
