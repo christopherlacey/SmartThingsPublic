@@ -11,6 +11,11 @@
 
 declare(strict_types=1);
 
+// The gate, before this page touches the database. auto_prepend_file normally
+// has it loaded already, in which case this is a no-op — but a .htaccess or
+// .user.ini deeper in the tree can unhook the prepend, and the work below
+// should not run for someone who is not signed in.
+require_once __DIR__ . '/ledger-auth.php';
 require __DIR__ . '/ledger-db.php';
 
 $PAGE_TITLE = 'Shopping';

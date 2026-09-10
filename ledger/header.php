@@ -44,6 +44,13 @@ $LEDGER_TITLE = $PAGE_TITLE
     ?? $title
     ?? ($LEDGER_NAV[$LEDGER_CURRENT] ?? 'The Lacey Ledger');
 
+// Mint the form token now, while headers can still be sent. footer.php needs
+// it for the sign-out form, and by then output has begun — a token minted at
+// that point could not be persisted, and Sign out would 400.
+if (function_exists('ledger_form_token')) {
+    ledger_form_token();
+}
+
 if (!function_exists('e')) {
     /** HTML-escape. Every value interpolated into markup goes through this. */
     function e(?string $s): string

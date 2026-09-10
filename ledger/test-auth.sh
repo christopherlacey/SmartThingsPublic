@@ -189,13 +189,58 @@ PG
 php -S "127.0.0.1:$((PORT+1))" -t "$TMP" -d session.save_path="$TMP/sess" >"$TMP/srv2.log" 2>&1 &
 SRV2=$!
 sleep 2
-c2=$(curl -sS -o "$TMP/body2" -w '%{http_code}' --max-redirs 0 "http://127.0.0.1:$((PORT+1))/selftest.php")
-kill "$SRV2" 2>/dev/null
+U="http://127.0.0.1:$((PORT+1))"
+c2=$(curl -sS -o "$TMP/body2" -w '%{http_code}' --max-redirs 0 "$U/selftest.php")
 if grep -q 'PRIVATE-VIA-HEADER' "$TMP/body2"; then
   red "header.php rendered with the prepend unhooked (got $c2)"
 else
   green "header.php enforces the gate on its own (got $c2)"
 fi
+
+# The backstop has to cover the work a page does BEFORE it includes the header,
+# which for Shopping is the write handler and for Finance the queries.
+for page in shopping.php finance.php; do
+  cp=$(curl -sS -o "$TMP/body3" -w '%{http_code}' --max-redirs 0 "$U/$page")
+  if [ "$cp" = "302" ]; then
+    green "$page refuses before doing any work (prepend unhooked)"
+  else
+    red "$page answered $cp with the prepend unhooked"
+  fi
+done
+# A write must not be attempted either.
+cw=$(curl -sS -o /dev/null -w '%{http_code}' --max-redirs 0 -X POST \
+     -d "action=add" -d "item=SHOULD-NOT-LAND" "$U/shopping.php")
+if [ "$cw" = "302" ]; then green "a write posted with the prepend unhooked is refused"
+else red "shopping.php answered $cw to an unauthenticated write"; fi
+kill "$SRV2" 2>/dev/null
+
+echo
+echo "An unreadable state file fails closed"
+# Present-but-unreadable must not read as "no failures yet", which would
+# disarm the replay counter for an attempt.
+UR="$TMP/unreadable"; mkdir -p "$UR"
+cp "$SRC/ledger-auth.php" "$SRC/ledger-totp.php" "$UR/"
+cat > "$UR/probe.php" <<'UNR'
+<?php
+$dir = __DIR__ . '/st'; @mkdir($dir, 0700, true);
+file_put_contents(__DIR__ . '/ledger-auth-config.php',
+    "<?php return ['state_dir'=>'$dir','allowed_emails'=>['a@b.c'],'google_hd'=>'',"
+  . "'google_client_id'=>'x','google_client_secret'=>'y','redirect_uri'=>'z',"
+  . "'totp_enabled'=>false,'totp_secret'=>'','idle_timeout'=>1,'absolute_timeout'=>1];");
+$_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/probe.php';
+require __DIR__ . '/ledger-auth.php';
+// A readable store is usable.
+ledger_state_write('totp.json', ['last_counter' => 1]);
+$before = ledger_state_usable() ? 'usable' : 'refused';
+// Make it unreadable. Running as root defeats chmod, so remove read access by
+// replacing the file with a directory of the same name — unreadable as a file
+// for any uid.
+unlink("$dir/totp.json"); mkdir("$dir/totp.json");
+$after = ledger_state_usable() ? 'usable' : 'refused';
+echo "$before/$after";
+UNR
+res=$(cd "$UR" && php probe.php 2>/dev/null)
+ok "usable when readable, refused when not" "$res" "usable/refused"
 
 echo
 echo "Signing out is a POST"

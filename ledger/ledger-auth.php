@@ -192,18 +192,53 @@ function ledger_state_usable(): bool
     if (!is_dir($dir)) {
         @mkdir($dir, 0700, true);
     }
-    return is_dir($dir) && is_writable($dir);
+    if (!is_dir($dir) || !is_writable($dir)) {
+        return false;
+    }
+
+    // A file that exists but cannot be read is just as broken as a directory
+    // that cannot be written, and fails the same way.
+    try {
+        ledger_state_read('totp.json');
+        ledger_state_read('login-attempts.json');
+    } catch (RuntimeException) {
+        return false;
+    }
+    return true;
 }
 
 function ledger_state_read(string $name): array
 {
     $path = ledger_state_path($name);
-    if (!is_readable($path)) {
+
+    // Absent is legitimate — nothing has happened yet. Anything else that
+    // cannot be read back is not: returning [] there would read as "no
+    // failures recorded" and disarm the replay counter for an attempt.
+    if (!file_exists($path)) {
         return [];
     }
-    $raw = file_get_contents($path);
-    $data = json_decode((string) $raw, true);
-    return is_array($data) ? $data : [];
+
+    // Not a plain file (a directory of the same name, a dangling link) is
+    // broken, and file_get_contents on a directory returns '' rather than
+    // false, so this has to be checked rather than inferred from the read.
+    if (!is_file($path) || !is_readable($path)) {
+        throw new RuntimeException('Cannot read state file ' . $path);
+    }
+
+    $raw = @file_get_contents($path);
+    if ($raw === false) {
+        throw new RuntimeException('Could not read ' . $path);
+    }
+    if ($raw === '') {
+        return [];   // written but empty: nothing recorded yet
+    }
+
+    $data = json_decode($raw, true);
+    if (!is_array($data)) {
+        // Corrupt. Do not let that read as "nothing has happened".
+        throw new RuntimeException('State file is not valid JSON: ' . $path);
+    }
+    return $data;
 }
 
 /** Write, or throw. Never return as though it worked. */
@@ -260,7 +295,12 @@ function ledger_attempts_cleared(): void
 /** Seconds still to wait, or 0 when not locked. */
 function ledger_locked_for(): int
 {
-    $recent = ledger_recent_failures();
+    try {
+        $recent = ledger_recent_failures();
+    } catch (RuntimeException) {
+        // Cannot tell how many failures there have been. Assume the worst.
+        return LEDGER_LOCKOUT;
+    }
     if (count($recent) < LEDGER_MAX_ATTEMPTS) {
         return 0;
     }

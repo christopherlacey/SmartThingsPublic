@@ -27,7 +27,7 @@ pattern as `connect/`.
 | `ledger-2fa-setup.php` | Enrol the second factor. |
 | `ledger-auth-config.php.example` | Copy to `ledger-auth-config.php`, fill in, **never commit**. |
 | `htaccess.example` / `user.ini.example` | Rendered to `.htaccess` / `.user.ini` at deploy time. |
-| `test-auth.sh` | Runs the gate against a throwaway local site. 48 checks. |
+| `test-auth.sh` | Runs the gate against a throwaway local site. 52 checks. |
 | `deploy.sh` | Backs up, copies, verifies. |
 
 ## Read this before deploying
@@ -279,7 +279,7 @@ just two doors instead of one.
 ### What is tested
 
 ```sh
-./test-auth.sh        # 48 checks, no setup, nothing left behind
+./test-auth.sh        # 52 checks, no setup, nothing left behind
 ```
 
 It stands up PHP's built-in server with `ledger-auth.php` wired through
@@ -320,7 +320,7 @@ brute-forcing it means already holding the Workspace account. That is also why
 attempts while locked can safely extend the lock — a stranger cannot reach this
 form at all, so it cannot be used to lock you out of your own dashboard.
 
-### Five bugs found in review, all fixed and all pinned by tests
+### Seven bugs found in review, all fixed and all pinned by tests
 
 **The gate matched public endpoints on file name.** Any file called `login.php`
 anywhere under the docroot was served without signing in — and blogs very often
@@ -350,6 +350,21 @@ worth doing, since pages whose source is not in this repo have no such backstop.
 
 **Sign-out was a plain link, and a failed callback ended a live session.** Either
 let any other site log you out. Both are closed above.
+
+**The backstop only covered part of each page.** `header.php` requires the gate,
+but `shopping.php` ran its write handler and `finance.php` its queries *before*
+including the header — so with the prepend unhooked that work happened for
+someone not signed in. Not reachable in practice (the write needs a CSRF token
+that is never handed out unauthenticated), but the wrong order. Both pages now
+require the gate as their first act.
+
+**A state file that existed but could not be read still read as "nothing
+recorded".** The first pass only caught an unwritable *directory*; a file with
+the wrong ownership — or, as it turned out, a directory sitting where the file
+should be, since `file_get_contents` returns `''` rather than `false` for one —
+came back as an empty array and disarmed the replay counter for an attempt.
+Reads now refuse anything that is not a readable plain file holding valid JSON,
+and an unreadable attempt log reads as locked rather than clear.
 
 **Constants sat below the CLI early-return.** PHP hoists function declarations
 but evaluates `const` in order, so on the CLI side `ledger-auth.php` had all its
