@@ -10,6 +10,7 @@
 #   SSH_HOST     user@host for the web server
 #   LEDGER_DIR   docroot serving c.lacey.me   (default /var/www/ledger)
 #   STATE_DIR    writable dir outside the docroot (default /var/lib/ledger)
+#   STATE_OWNER  user the web server runs as; guessed if unset (www-data, …)
 #
 # header.php and footer.php are REPLACED. Every run takes a timestamped backup
 # of the current ones first and prints how to roll back, because the versions
@@ -24,6 +25,7 @@ set -euo pipefail
 SSH_HOST="${SSH_HOST:-}"
 LEDGER_DIR="${LEDGER_DIR:-/var/www/ledger}"
 STATE_DIR="${STATE_DIR:-/var/lib/ledger}"
+STATE_OWNER="${STATE_OWNER:-}"
 BASE_URL="${BASE_URL:-https://c.lacey.me}"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -163,14 +165,32 @@ green "  code copied, .htaccess and .user.ini rendered for $LEDGER_DIR"
 
 # ---- state dir and config seeding -----------------------------------------
 
-seeded=$(ssh "$SSH_HOST" bash -s -- "$LEDGER_DIR" "$STATE_DIR" <<'REMOTE'
+# The web server must be able to write the TOTP replay counter and the attempt
+# log. If it cannot, the second factor has no replay protection and no lockout
+# — so this is set up explicitly and checked, not attempted with `|| true`.
+rc=0
+seeded=$(ssh "$SSH_HOST" bash -s -- "$LEDGER_DIR" "$STATE_DIR" "$STATE_OWNER" <<'REMOTE'
 set -eu
-dir="$1"; state="$2"; seeded=0
+dir="$1"; state="$2"; owner="$3"; seeded=0
 
 mkdir -p "$state"
-chmod 700 "$state" 2>/dev/null || true
-# The web server needs to write the TOTP replay counter and attempt log.
-chown "$(ps -o user= -p "$(pgrep -n 'apache2|httpd|php-fpm' 2>/dev/null || echo $$)" 2>/dev/null || echo root)" "$state" 2>/dev/null || true
+
+if [ -z "$owner" ]; then
+  for u in www-data apache httpd nginx; do
+    if id "$u" >/dev/null 2>&1; then owner="$u"; break; fi
+  done
+fi
+
+if [ -n "$owner" ]; then
+  if ! chown "$owner" "$state"; then
+    echo "STATE_CHOWN_FAILED" >&2
+    exit 3
+  fi
+  chmod 700 "$state"
+else
+  echo "STATE_OWNER_UNKNOWN" >&2
+  exit 4
+fi
 
 for f in ledger-config ledger-auth-config; do
   if [ ! -f "$dir/$f.php" ]; then
@@ -181,7 +201,18 @@ for f in ledger-config ledger-auth-config; do
 done
 echo "$seeded"
 REMOTE
-)
+) || rc=$?
+
+if [ "$rc" = "3" ] || [ "$rc" = "4" ]; then
+  echo
+  red "Could not give the web server ownership of $STATE_DIR."
+  red "Without a writable state directory the second factor has no replay"
+  red "protection and no lockout, and sign-in will refuse codes rather than"
+  red "accept them unprotected. Fix it and re-run:"
+  echo "    ssh $SSH_HOST sudo chown <web-server-user> $STATE_DIR"
+  echo "  or re-run with the user named: STATE_OWNER=www-data ./deploy.sh"
+  exit 1
+fi
 
 if [ "$seeded" = "1" ]; then
   echo

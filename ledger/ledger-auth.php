@@ -133,14 +133,43 @@ function ledger_email_allowed(string $email): bool
 
 /* ------------------------------------------------------- state on disk -- */
 
-/** Small JSON blob beside the config: TOTP replay counter, failed attempts. */
+/**
+ * Small JSON blob beside the config: TOTP replay counter, failed attempts.
+ *
+ * This store is not a cache. The replay counter IS the replay protection, and
+ * the attempt counter IS the lockout, so a store that cannot be written means
+ * neither control is in force. Everything here therefore reports failure
+ * loudly instead of quietly carrying on — see ledger_state_usable().
+ */
+function ledger_state_dir(): string
+{
+    return rtrim((string) (ledger_auth_config()['state_dir'] ?? sys_get_temp_dir()), '/');
+}
+
 function ledger_state_path(string $name): string
 {
-    $dir = ledger_auth_config()['state_dir'] ?? sys_get_temp_dir();
+    $dir = ledger_state_dir();
     if (!is_dir($dir)) {
         @mkdir($dir, 0700, true);
     }
-    return rtrim($dir, '/') . '/' . $name;
+    return $dir . '/' . $name;
+}
+
+/**
+ * Can this request actually persist state?
+ *
+ * A deploy that leaves state_dir owned by the wrong user is the realistic way
+ * this breaks, and it breaks silently: the directory is simply not writable by
+ * the web server. Callers use this to refuse a sign-in rather than accept one
+ * they cannot record.
+ */
+function ledger_state_usable(): bool
+{
+    $dir = ledger_state_dir();
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0700, true);
+    }
+    return is_dir($dir) && is_writable($dir);
 }
 
 function ledger_state_read(string $name): array
@@ -154,10 +183,14 @@ function ledger_state_read(string $name): array
     return is_array($data) ? $data : [];
 }
 
+/** Write, or throw. Never return as though it worked. */
 function ledger_state_write(string $name, array $data): void
 {
     $path = ledger_state_path($name);
-    file_put_contents($path, json_encode($data), LOCK_EX);
+    $written = @file_put_contents($path, json_encode($data), LOCK_EX);
+    if ($written === false) {
+        throw new RuntimeException('Could not write ' . $path);
+    }
     @chmod($path, 0600);
 }
 

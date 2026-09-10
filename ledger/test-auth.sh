@@ -135,6 +135,68 @@ ok "no config means no entry" "$(code "$B/index.php")" "503"
 grep -q 'PRIVATE-PAGE' "$TMP/body" && red "served a page with no config" || green "serves nothing with no config"
 mv "$TMP/held.php" "$TMP/ledger-auth-config.php"
 
+# The replay counter and the lockout both live in state_dir. If it cannot be
+# written neither control is in force, so a code must be REFUSED rather than
+# waved through. This is what a deploy that leaves /var/lib/ledger owned by the
+# wrong user produces. Run against a second server configured that way from the
+# start — permission bits alone would not do it, since these tests may run as
+# root, which ignores them.
+BAD="$TMP/bad"; mkdir -p "$BAD/sess"
+cp "$TMP"/*.php "$TMP"/*.css "$TMP"/*.sql "$BAD/" 2>/dev/null
+: > "$BAD/not-a-dir"
+sed "s|'state_dir' => .*|'state_dir' => '$BAD/not-a-dir',|" "$TMP/ledger-auth-config.php" > "$BAD/ledger-auth-config.php"
+sed "s|$TMP/t.sqlite|$TMP/t.sqlite|" "$TMP/ledger-config.php" > "$BAD/ledger-config.php"
+echo '<?php echo "PRIVATE-PAGE";' > "$BAD/index.php"
+
+php -S "127.0.0.1:$((PORT+2))" -t "$BAD" \
+    -d auto_prepend_file="$BAD/ledger-auth.php" \
+    -d session.save_path="$BAD/sess" >"$TMP/srv3.log" 2>&1 &
+SRV3=$!
+sleep 2
+BB="http://127.0.0.1:$((PORT+2))"
+
+SIDB=$(php -r 'echo bin2hex(random_bytes(16));')
+php -r '
+  [$dir,$sid] = array_slice($argv,1);
+  $d  = "ledger_email|".serialize("chris@chrislacey.com");
+  $d .= "ledger_login_at|".serialize(time()-60);
+  $d .= "ledger_seen_at|".serialize(time()-60);
+  $d .= "ledger_2fa_ok|".serialize(false);
+  file_put_contents("$dir/sess_$sid", $d);
+' "$BAD/sess" "$SIDB"
+
+CSRFB=$(curl -sS -b "PHPSESSID=$SIDB" "$BB/login.php" | grep -oE 'value="[a-f0-9]{64}"' | head -1 | grep -oE '[a-f0-9]{64}')
+CODEB=$(php -r "require '$SRC/ledger-totp.php'; echo totp_code_at('$SECRET', totp_counter());")
+scb=$(curl -sS -o "$TMP/bodyb" -w '%{http_code}' -b "PHPSESSID=$SIDB" -X POST \
+      -d "csrf=$CSRFB" -d "action=totp" -d "code=$CODEB" "$BB/login.php")
+kill "$SRV3" 2>/dev/null
+if grep -q 'be checked safely right now' "$TMP/bodyb"; then
+  green "an unusable state dir refuses the code"
+else
+  red "an unusable state dir did NOT refuse the code (http $scb) — replay protection would be off"
+  sed -e 's/<[^>]*>//g' "$TMP/bodyb" | grep -viE '^[[:space:]]*$' | head -3 | sed 's/^/        /'
+fi
+
+echo
+echo "Gate does not rest on auto_prepend_file alone"
+# A .htaccess or .user.ini deeper in the tree can unhook the prepend. Pages
+# that use header.php require the gate themselves, so they must still refuse.
+# Tested with a second server started WITHOUT auto_prepend_file.
+cat > "$TMP/selftest.php" <<'PG'
+<?php $PAGE_TITLE = 'Self test'; require __DIR__ . '/header.php';
+echo "PRIVATE-VIA-HEADER"; require __DIR__ . '/footer.php';
+PG
+php -S "127.0.0.1:$((PORT+1))" -t "$TMP" -d session.save_path="$TMP/sess" >"$TMP/srv2.log" 2>&1 &
+SRV2=$!
+sleep 2
+c2=$(curl -sS -o "$TMP/body2" -w '%{http_code}' --max-redirs 0 "http://127.0.0.1:$((PORT+1))/selftest.php")
+kill "$SRV2" 2>/dev/null
+if grep -q 'PRIVATE-VIA-HEADER' "$TMP/body2"; then
+  red "header.php rendered with the prepend unhooked (got $c2)"
+else
+  green "header.php enforces the gate on its own (got $c2)"
+fi
+
 echo
 echo "No PHP errors anywhere"
 grep -iE 'Fatal error|Parse error|Uncaught|Deprecated' "$TMP/srv.log" | head -3

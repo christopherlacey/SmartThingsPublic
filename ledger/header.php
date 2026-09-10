@@ -2,13 +2,23 @@
 /**
  * The Lacey Ledger — shared page chrome (top half).
  *
+ * Belt and braces on the gate: auto_prepend_file is a per-directory setting,
+ * so a .htaccess or .user.ini placed deeper in the tree can override it and
+ * silently unhook ledger-auth.php for that subtree. Requiring it here means a
+ * page that uses this header enforces sign-in on its own account. When the
+ * prepend did run, require_once is a no-op — the file is already loaded.
+ */
+require_once __DIR__ . '/ledger-auth.php';
+
+/**
  * Drop-in replacement for the existing header.php. It is deliberately
  * defensive about how the calling page talks to it, so no existing tab has to
  * be edited:
  *
  *   - Title: uses $PAGE_TITLE, $page_title or $title, whichever is set.
- *   - Active tab: derived from the running script's filename, so pages do not
- *     have to declare which tab they are.
+ *   - Active tab: derived from the running script's file name, so pages do not
+ *     have to declare which tab they are. (Only cosmetic — the gate itself
+ *     matches on resolved paths, not names.)
  *
  * Every page ends with:  <?php require __DIR__ . '/footer.php'; ?>
  */

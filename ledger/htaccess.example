@@ -9,6 +9,24 @@
 # Runs ledger-auth.php before EVERY PHP request under this directory, including
 # pages whose source is not in this repo. mod_php only — with PHP-FPM or CGI
 # this line does nothing and .user.ini carries it instead.
+#
+# BETTER, IF YOU CAN EDIT THE VHOST: auto_prepend_file is a per-directory
+# setting, so a .htaccess or .user.ini placed DEEPER in the tree overrides it
+# and silently unhooks the gate for that subtree. A blog plugin that writes its
+# own .user.ini would do exactly that. Setting it in the vhost with
+# php_admin_value instead cannot be overridden from any directory:
+#
+#   <Directory "__LEDGER_DIR__">
+#     php_admin_value auto_prepend_file "__LEDGER_DIR__/ledger-auth.php"
+#   </Directory>
+#
+# or, for PHP-FPM, in the pool config:
+#
+#   php_admin_value[auto_prepend_file] = __LEDGER_DIR__/ledger-auth.php
+#
+# header.php also requires the gate itself, so any page using it enforces
+# sign-in even if the prepend stops applying. Pages whose source is not in this
+# repo have no such backstop, which is why the vhost form is worth the trouble.
 <IfModule mod_php.c>
   php_value auto_prepend_file "__LEDGER_DIR__/ledger-auth.php"
 </IfModule>

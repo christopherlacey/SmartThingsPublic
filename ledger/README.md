@@ -27,7 +27,7 @@ pattern as `connect/`.
 | `ledger-2fa-setup.php` | Enrol the second factor. |
 | `ledger-auth-config.php.example` | Copy to `ledger-auth-config.php`, fill in, **never commit**. |
 | `htaccess.example` / `user.ini.example` | Rendered to `.htaccess` / `.user.ini` at deploy time. |
-| `test-auth.sh` | Runs the gate against a throwaway local site. 29 checks. |
+| `test-auth.sh` | Runs the gate against a throwaway local site. 31 checks. |
 | `deploy.sh` | Backs up, copies, verifies. |
 
 ## Read this before deploying
@@ -279,7 +279,7 @@ just two doors instead of one.
 ### What is tested
 
 ```sh
-./test-auth.sh        # 29 checks, no setup, nothing left behind
+./test-auth.sh        # 31 checks, no setup, nothing left behind
 ```
 
 It stands up PHP's built-in server with `ledger-auth.php` wired through
@@ -296,11 +296,31 @@ plus replay refusal and clock drift either side.
 The Google round trip itself needs real credentials, so that is the one part
 only your first real sign-in can confirm.
 
-**One bug worth naming**, because the test suite now pins it: the first cut of
-the gate matched its public endpoints on the file *name*, which meant any file
-called `login.php` anywhere under the docroot was served without signing in —
-and blogs very often have one. `/blog/login.php` is a 404 today, so nothing was
-exposed, but it was a hole waiting for someone to add a file. The gate now
-matches the resolved absolute path, and `test-auth.sh` plants a decoy
-`blog/login.php` on every run to make sure it stays shut.
+### Three bugs found in review, all fixed and all pinned by tests
+
+**The gate matched public endpoints on file name.** Any file called `login.php`
+anywhere under the docroot was served without signing in — and blogs very often
+have one. `/blog/login.php` is a 404 today so nothing was exposed, but it was a
+hole waiting for a file to be added. The gate now matches the resolved absolute
+path, and the suite plants a decoy `blog/login.php` on every run.
+
+**The second factor failed open.** The replay counter and the lockout both live
+in `state_dir`, and the code treated an unwritable directory as "no counter
+yet": every code in the ±1 window stayed valid, repeatedly, and the five-attempt
+lockout never engaged. Nothing surfaced it — sign-in still worked perfectly.
+`deploy.sh` made it likely, too: it tried to `chown` the state directory with
+`|| true` on every step, so a non-root deploy left it unwritable by the web
+server and said nothing. Now the store throws instead of returning quietly, a
+code that cannot be spent is refused rather than accepted, and the deploy fails
+loudly with the exact `chown` to run (`STATE_OWNER=www-data ./deploy.sh` names
+the user outright).
+
+**The whole gate rested on one overridable setting.** `auto_prepend_file` is
+per-directory, so a `.htaccess` or `.user.ini` deeper in the tree — the sort of
+thing a blog plugin writes by itself — would silently unhook it for that
+subtree, and nothing in the pages re-checked. `header.php` now requires the gate
+itself, so any page using it enforces sign-in on its own account; under the
+prepend that `require_once` is a no-op. Both config templates now recommend
+`php_admin_value` in the vhost or FPM pool, which no directory can override —
+worth doing, since pages whose source is not in this repo have no such backstop.
 

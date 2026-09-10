@@ -62,7 +62,7 @@ function ledger_attempts_cleared(): void
     ledger_state_write('login-attempts.json', ['count' => 0, 'since' => time()]);
 }
 
-$attempts  = ledger_attempts();
+$attempts  = ledger_attempts();   // read-only; an unreadable store reads as zero
 $lockedFor = $attempts['count'] >= LEDGER_MAX_ATTEMPTS
     ? LEDGER_LOCKOUT - (time() - $attempts['since'])
     : 0;
@@ -108,7 +108,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     /* Step 2 — the code from the authenticator. */
     if ($action === 'totp' && $googleDone && $totpRequired) {
-        if ($lockedFor > 0) {
+        if (!ledger_state_usable()) {
+            // Without a writable store there is no replay counter and no
+            // lockout, so the second factor would only look like one. Refuse
+            // rather than accept a code we cannot spend.
+            error_log('ledger: state_dir is not writable (' . ledger_state_dir()
+                . ') — refusing the second factor rather than accepting it unprotected');
+            $error = 'The second factor can’t be checked safely right now, so sign-in is '
+                   . 'blocked. The server’s state directory is not writable.';
+        } elseif ($lockedFor > 0) {
             $error = 'Too many attempts. Try again in ' . ceil($lockedFor / 60) . ' minutes.';
         } else {
             $state = ledger_state_read('totp.json');
@@ -121,21 +129,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
 
             if ($counter === null) {
-                ledger_attempt_failed();
+                try {
+                    ledger_attempt_failed();
+                } catch (RuntimeException) {
+                    // Counted or not, the code was wrong.
+                }
                 $error = 'That code isn’t right.';
             } else {
-                // Burn the step so the same code cannot be used twice.
-                ledger_state_write('totp.json', ['last_counter' => $counter]);
-                ledger_attempts_cleared();
+                // Burn the step BEFORE letting anyone in, so a code can never be
+                // accepted twice. If it cannot be burned, it is not accepted.
+                $spent = true;
+                try {
+                    ledger_state_write('totp.json', ['last_counter' => $counter]);
+                } catch (RuntimeException $ex) {
+                    $spent = false;
+                    error_log('ledger: could not record the used TOTP step: ' . $ex->getMessage());
+                    $error = 'The second factor can’t be checked safely right now, so sign-in '
+                           . 'is blocked. The server’s state directory is not writable.';
+                }
 
-                session_regenerate_id(true);
-                $_SESSION['ledger_2fa_ok']  = true;
-                $_SESSION['ledger_seen_at'] = time();
+                if ($spent) {
+                    try {
+                        ledger_attempts_cleared();
+                    } catch (RuntimeException) {
+                        // Not fatal: the code was right and has been spent.
+                    }
 
-                $to = $_SESSION['ledger_return_to'] ?? '/';
-                unset($_SESSION['ledger_return_to']);
-                header('Location: ' . $to, true, 302);
-                exit;
+                    session_regenerate_id(true);
+                    $_SESSION['ledger_2fa_ok']  = true;
+                    $_SESSION['ledger_seen_at'] = time();
+
+                    $to = $_SESSION['ledger_return_to'] ?? '/';
+                    unset($_SESSION['ledger_return_to']);
+                    header('Location: ' . $to, true, 302);
+                    exit;
+                }
             }
         }
     }
